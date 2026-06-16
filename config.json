@@ -1,0 +1,10 @@
+{
+  "base_dir": "C:\\Users\\Lucifer\\Downloads\\CustomRoms",
+  "device_path": "C:\\Users\\Lucifer\\Downloads\\CustomRoms\\Poco F1",
+  "folders": {
+    "flash_boot": "Recoverys\\boot",
+    "flash_rec": "Recoverys",
+    "sideload": "Roms",
+    "wipe_super": "Recoverys"
+  }
+}
