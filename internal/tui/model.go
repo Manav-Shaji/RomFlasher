@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"flashtool/internal/core"
-	"flashtool/internal/config"
+	"flashtool/internal/app"
+	"flashtool/internal/domain"
 
 	"time"
 
@@ -25,6 +25,58 @@ const (
 	ModalSettings
 )
 
+type LogBuffer struct {
+	data  []domain.LogEntry
+	size  int
+	head  int
+	count int
+}
+
+func NewLogBuffer(size int) *LogBuffer {
+	return &LogBuffer{
+		data: make([]domain.LogEntry, size),
+		size: size,
+	}
+}
+
+func (lb *LogBuffer) Add(entry domain.LogEntry) {
+	if lb.count < lb.size {
+		lb.data[lb.count] = entry
+		lb.count++
+	} else {
+		lb.data[lb.head] = entry
+		lb.head = (lb.head + 1) % lb.size
+	}
+}
+
+func (lb *LogBuffer) Len() int {
+	return lb.count
+}
+
+func (lb *LogBuffer) Iterate(fn func(domain.LogEntry)) {
+	for i := 0; i < lb.count; i++ {
+		idx := (lb.head + i) % lb.size
+		fn(lb.data[idx])
+	}
+}
+
+func (lb *LogBuffer) ReplaceLast(entry domain.LogEntry) {
+	if lb.count == 0 {
+		lb.Add(entry)
+		return
+	}
+	idx := (lb.head + lb.count - 1) % lb.size
+	lb.data[idx] = entry
+}
+
+func (lb *LogBuffer) Last() (domain.LogEntry, bool) {
+	if lb.count == 0 {
+		return domain.LogEntry{}, false
+	}
+	idx := (lb.head + lb.count - 1) % lb.size
+	return lb.data[idx], true
+}
+
 
 
 /* DATA MODELS */
@@ -44,7 +96,7 @@ type FileItem struct {
 
 type Toast struct {
 	Message string
-	Type    core.LogLevel
+	Type    domain.LogLevel
 }
 
 /* APP MODEL */
@@ -58,10 +110,10 @@ type AppModel struct {
 	ActiveModal   ModalType
 	Tick          int // Pulsing animation tick
 
-	Engine        *core.Engine
+	App           *app.App
 
 	// 2. Device State
-	Device core.DeviceState
+	Device domain.DeviceState
 
 	// 3. UI Components (Standard Bubbles)
 	UI struct {
@@ -83,7 +135,7 @@ type AppModel struct {
 		FileFilter   string
 		OnFileSelect func(string) tea.Cmd
 
-		CustomLogs     []core.LogEntry
+		CustomLogs     *LogBuffer
 		CustomViewport viewport.Model
 		Width          int
 
@@ -92,11 +144,11 @@ type AppModel struct {
 	}
 
 	// 5. Feedback & Logs
-	Logs        []core.LogEntry
+	Logs        *LogBuffer
 	ActiveToast *Toast
+	LogsDirty   bool
 
 	// 6. Config & Paths
-	Config     config.AppConfig
 	BaseDir    string
 	DevicePath string
 
@@ -106,25 +158,24 @@ type AppModel struct {
 
 /* FACTORY */
 
-func NewModel() AppModel {
-	cfg := config.LoadConfig()
+func NewModel(app *app.App) AppModel {
 	m := AppModel{
-		Engine: core.NewEngine(),
-		Config: cfg,
-		BaseDir: cfg.BaseDir,
-		DevicePath: cfg.DevicePath,
-		Device: core.DeviceState{
-			Mode:    core.ModeDisconnected,
+		App: app,
+		BaseDir: app.Config.BaseDir,
+		DevicePath: app.Config.DevicePath,
+		Device: domain.DeviceState{
+			Mode:    domain.ModeDisconnected,
 			Serial:  "-",
 			Model:   "-",
 			Battery: "-",
 			Slot:    "-",
 			Secure:  "-",
 		},
-		Logs: []core.LogEntry{
-			{Level: core.LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()},
-		},
+		Logs: NewLogBuffer(500),
 	}
+	m.Logs.Add(domain.LogEntry{Level: domain.LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()})
+	m.Modal.CustomLogs = NewLogBuffer(500)
+	
 	m.Menu = GetDefaultMenu()
 	m.SetupUI()
 	m.UI.Viewport = viewport.New(0, 0)

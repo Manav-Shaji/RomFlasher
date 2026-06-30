@@ -1,7 +1,9 @@
 package tui
 
 import (
-	"flashtool/internal/core"
+	"flashtool/internal/domain"
+	"flashtool/internal/engine"
+	"flashtool/internal/platform/adb"
 
 	"os"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 type ToastTimeoutMsg struct{}
 type SetupMainDirMsg string
 type SetupDeviceDirMsg string
+type LogTickMsg time.Time
 
 type SetupConfirmMsg struct {
 	Msg string
@@ -31,14 +34,25 @@ type SettingsFolderSelectedMsg struct {
 	Path  string
 }
 
+type SearchDebounceMsg struct {
+	Query string
+}
+
 /* INIT */
 
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
-		core.PollDeviceCmd(),
-		m.Engine.WaitForLogs(),
+		adb.PollDeviceCmd(),
+		m.App.Engine.WaitForLogs(),
+		LogTickCmd(),
 		textinput.Blink,
 	)
+}
+
+func LogTickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return LogTickMsg(t)
+	})
 }
 
 /* UPDATE */
@@ -51,24 +65,59 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 
-	case core.HeartbeatMsg:
+	case adb.HeartbeatMsg:
 		m.Tick++
-		return m, core.HeartbeatCmd()
+		return m, adb.HeartbeatCmd()
 
-	case core.PollMsg:
+	case LogTickMsg:
+		if m.LogsDirty {
+			if m.ActiveModal == ModalCustom {
+				innerW := m.Modal.CustomViewport.Width
+				m.Modal.CustomViewport.SetContent(RenderLogsStr(m.Modal.CustomLogs, innerW))
+				m.Modal.CustomViewport.GotoBottom()
+			} else {
+				_, detailW, _, _, logH := m.GetLayoutDimensions()
+				m.UI.Viewport.Width = detailW - 2
+				m.UI.Viewport.Height = logH
+				m.UI.Viewport.SetContent(RenderLogsStr(m.Logs, m.UI.Viewport.Width))
+				m.UI.Viewport.GotoBottom()
+			}
+			m.LogsDirty = false
+		}
+		return m, LogTickCmd()
+
+	case adb.PollMsg:
 		return m.handlePollMsg(msg)
 
-	case core.DeviceUpdateMsg:
+	case adb.DeviceUpdateMsg:
 		return m.handleDeviceUpdate(msg)
 
-	case core.LogMsg:
+	case engine.LogMsg:
 		return m.handleLogMsg(msg)
 
-	case core.TaskCompleteMsg:
+	case engine.TaskCompleteMsg:
 		return m.handleTaskComplete(msg)
 
 	case ToastTimeoutMsg:
 		m.ActiveToast = nil
+		return m, nil
+
+	case SearchDebounceMsg:
+		if m.ActiveModal == ModalFile && m.UI.TextInput.Value() == msg.Query {
+			val := strings.ToLower(msg.Query)
+			if val != "" {
+				var filtered []FileItem
+				for _, f := range m.Modal.FullFileList {
+					if strings.Contains(strings.ToLower(f.Name), val) {
+						filtered = append(filtered, f)
+					}
+				}
+				m.Modal.FileList = filtered
+			} else {
+				m.Modal.FileList = m.Modal.FullFileList
+			}
+			m.Modal.FileCursor = 0
+		}
 		return m, nil
 
 	case SetupMainDirMsg, SetupDeviceDirMsg, SetupConfirmMsg, SettingsFolderSelectedMsg:
@@ -113,38 +162,59 @@ func toastTimeoutCmd(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return ToastTimeoutMsg{} })
 }
 
-func RenderLogsStr(logs []core.LogEntry, width int) string {
+var (
+	baseLogStyle    = lipgloss.NewStyle()
+	errorLogStyle   = lipgloss.NewStyle().Bold(true)
+	successLogStyle = lipgloss.NewStyle().Bold(true)
+	adbStyle        = lipgloss.NewStyle().Bold(true)
+	fastbootStyle   = lipgloss.NewStyle().Bold(true)
+	actionStyle     = lipgloss.NewStyle().Bold(true)
+	doneStyle       = lipgloss.NewStyle().Bold(true)
+	failedStyle     = lipgloss.NewStyle().Bold(true)
+)
+
+func RenderLogsStr(logs *LogBuffer, width int) string {
 	var b strings.Builder
-	for _, l := range logs {
-		style := lipgloss.NewStyle().
-			Foreground(theme.CurrentTheme.Foreground).
-			Width(width).
-			PaddingRight(1)
-		
+	
+	if logs == nil {
+		return ""
+	}
+
+	// Pre-apply theme colors to the package-level styles once per render (in case theme changed)
+	baseLogStyle = baseLogStyle.Foreground(theme.CurrentTheme.Foreground).Width(width).PaddingRight(1)
+	errorLogStyle = errorLogStyle.Foreground(theme.CurrentTheme.Error)
+	successLogStyle = successLogStyle.Foreground(theme.CurrentTheme.Success)
+	adbStyle = adbStyle.Foreground(theme.CurrentTheme.Highlight)
+	fastbootStyle = fastbootStyle.Foreground(theme.CurrentTheme.Accent)
+	actionStyle = actionStyle.Foreground(theme.CurrentTheme.Warning)
+	doneStyle = doneStyle.Foreground(theme.CurrentTheme.Success)
+	failedStyle = failedStyle.Foreground(theme.CurrentTheme.Error)
+
+	logs.Iterate(func(l domain.LogEntry) {
+		style := baseLogStyle
 		text := l.Text
 		
 		// 1. Level-based styling
 		switch l.Level {
-		case core.LogError:
-			style = style.Foreground(theme.CurrentTheme.Error).Bold(true)
-		case core.LogSuccess:
-			style = style.Foreground(theme.CurrentTheme.Success).Bold(true)
+		case domain.LogError:
+			style = baseLogStyle.Inherit(errorLogStyle)
+		case domain.LogSuccess:
+			style = baseLogStyle.Inherit(successLogStyle)
 		}
 
 		// 2. Keyword Highlighting
 		if strings.HasPrefix(text, ">") {
-			// It's a command
 			cmdPart := text
 			if strings.Contains(text, "adb") {
-				cmdPart = strings.Replace(text, "adb", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render("adb"), 1)
+				cmdPart = strings.Replace(text, "adb", adbStyle.Render("adb"), 1)
 			} else if strings.Contains(text, "fastboot") {
-				cmdPart = strings.Replace(text, "fastboot", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Bold(true).Render("fastboot"), 1)
+				cmdPart = strings.Replace(text, "fastboot", fastbootStyle.Render("fastboot"), 1)
 			}
 			
 			// Highlight actions
 			for _, action := range []string{"flash", "sideload", "wipe-super", "reboot"} {
 				if strings.Contains(cmdPart, action) {
-					coloredAction := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Warning).Bold(true).Render(action)
+					coloredAction := actionStyle.Render(action)
 					cmdPart = strings.Replace(cmdPart, action, coloredAction, 1)
 				}
 			}
@@ -153,14 +223,14 @@ func RenderLogsStr(logs []core.LogEntry, width int) string {
 
 		// 3. Status Highlights
 		if strings.Contains(text, "[ DONE ]") {
-			text = strings.Replace(text, "[ DONE ]", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Success).Bold(true).Render("[ DONE ]"), 1)
+			text = strings.Replace(text, "[ DONE ]", doneStyle.Render("[ DONE ]"), 1)
 		} else if strings.Contains(text, "[ FAILED") {
-			text = strings.Replace(text, "[ FAILED", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Error).Bold(true).Render("[ FAILED"), 1)
+			text = strings.Replace(text, "[ FAILED", failedStyle.Render("[ FAILED"), 1)
 		}
 
 		b.WriteString(style.Render(text))
 		b.WriteByte('\n')
-	}
+	})
 	return b.String()
 }
 

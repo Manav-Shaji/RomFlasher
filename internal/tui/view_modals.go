@@ -17,7 +17,7 @@ func renderModal(m AppModel) string {
 	if m.ActiveModal == ModalCustom { h = 24 }
 	if m.ActiveModal == ModalSettings { h = 22 }
 	
-	style := theme.GetBorderStyle().Width(w).Height(h).Border(lipgloss.RoundedBorder()).BorderForeground(theme.CurrentTheme.Highlight)
+	style := theme.BorderStyle.Copy().Width(w).Height(h).Border(lipgloss.RoundedBorder()).BorderForeground(theme.CurrentTheme.Highlight)
 	
 	switch m.ActiveModal {
 	case ModalFile:
@@ -35,7 +35,7 @@ func renderModal(m AppModel) string {
 }
 
 func renderFileModal(m AppModel, w int) string {
-	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render(m.Modal.FileTitle)
+	title := theme.TitleStyle.Copy().Width(w - 4).Align(lipgloss.Center).Render(m.Modal.FileTitle)
 	var b strings.Builder
 	
 	// Path Box
@@ -62,24 +62,24 @@ func renderFileModal(m AppModel, w int) string {
 		if len(name) > 40 { name = name[:37] + "..." }
 		if i == m.Modal.FileCursor {
 			barWidth := w - 8
-			b.WriteString(theme.GetSelectedStyle().Width(barWidth).Background(theme.CurrentTheme.Highlight).Foreground(theme.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)))
+			b.WriteString(theme.SelectedStyle.Copy().Width(barWidth).Background(theme.CurrentTheme.Highlight).Foreground(theme.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)))
 			b.WriteByte('\n')
 		} else {
-			s := theme.GetBaseStyle()
+			s := theme.BaseStyle.Copy()
 			if f.Name == "[ SELECT THIS FOLDER ]" { s = s.Foreground(theme.CurrentTheme.Highlight).Bold(true) }
 			b.WriteString(fmt.Sprintf("   %s  %s\n", icon, s.Render(name)))
 		}
 	}
 	for i := 0; i < (10 - (end - start)); i++ { b.WriteByte('\n') }
-	fLeft := theme.GetDimStyle().Render(fmt.Sprintf(" %d items match", len(m.Modal.FileList)))
-	fRight := theme.GetDimStyle().Render("↑/↓ Nav • ↵ Open • Esc Back ")
+	fLeft := theme.DimStyle.Copy().Render(fmt.Sprintf(" %d items match", len(m.Modal.FileList)))
+	fRight := theme.DimStyle.Copy().Render("↑/↓ Nav • ↵ Open • Esc Back ")
 	space := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 4
 	b.WriteString(fmt.Sprintf("\n%s%s%s", fLeft, strings.Repeat(" ", space), fRight))
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
 func renderCustomModal(m AppModel, w, _ int) string {
-	title := theme.GetTitleStyle().
+	title := theme.TitleStyle.Copy().
 		Background(theme.CurrentTheme.Highlight).
 		Foreground(theme.CurrentTheme.Background).
 		Width(w - 4).
@@ -96,8 +96,8 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	m.Modal.CustomViewport.Height = 11
 	
 	outputContent := m.Modal.CustomViewport.View()
-	if len(m.Modal.CustomLogs) == 0 && !m.Busy {
-		outputContent = theme.GetDimStyle().Italic(true).Render("\n\n  Terminal initialized. Enter command below...")
+	if m.Modal.CustomLogs.Len() == 0 && !m.Busy {
+		outputContent = theme.DimStyle.Copy().Italic(true).Render("\n\n  Terminal initialized. Enter command below...")
 	}
 	
 	outputBox := lipgloss.NewStyle().
@@ -114,7 +114,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	inputLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
 	m.UI.TextInput.Prompt = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Render(" ❯ ")
 	inputField := m.UI.TextInput.View()
-	if m.Busy { inputField = theme.GetDimStyle().Render("Executing command... ⚡") }
+	if m.Busy { inputField = theme.DimStyle.Copy().Render("Executing command... ⚡") }
 	
 	inputLine := lipgloss.JoinHorizontal(lipgloss.Left, inputLabel, " ", inputField)
 	inputBox := lipgloss.NewStyle().Background(lipgloss.Color("#1a1a2e")).Width(innerW).Padding(0, 1).Render(inputLine)
@@ -123,12 +123,12 @@ func renderCustomModal(m AppModel, w, _ int) string {
 
 	
 	// 3. Footer
-	examples := theme.GetDimStyle().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
-	if len(m.Modal.CustomLogs) > 0 || m.Busy {
-		examples = theme.GetDimStyle().Render(fmt.Sprintf(" History: %d lines", len(m.Modal.CustomLogs)))
+	examples := theme.DimStyle.Copy().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
+	if m.Modal.CustomLogs.Len() > 0 || m.Busy {
+		examples = theme.DimStyle.Copy().Render(fmt.Sprintf(" History: %d lines", m.Modal.CustomLogs.Len()))
 	}
 
-	fLeft, fRight := examples, theme.GetDimStyle().Render("↵ EXECUTE  •  ESC EXIT ")
+	fLeft, fRight := examples, theme.DimStyle.Copy().Render("↵ EXECUTE  •  ESC EXIT ")
 	spaceCount := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 8
 	if spaceCount < 0 { spaceCount = 0 }
 	
@@ -139,8 +139,8 @@ func renderCustomModal(m AppModel, w, _ int) string {
 }
 
 func renderHelpModal(_ AppModel, w int) string {
-	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("SYSTEM DOCUMENTATION")
-	hl := theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Width(w - 8).Align(lipgloss.Center)
+	title := theme.TitleStyle.Copy().Width(w - 4).Align(lipgloss.Center).Render("SYSTEM DOCUMENTATION")
+	hl := theme.TitleStyle.Copy().Foreground(theme.CurrentTheme.Highlight).Width(w - 8).Align(lipgloss.Center)
 	row := func(k, v string) string {
 		return fmt.Sprintf(" %s %s\n", lipgloss.NewStyle().Width(18).Foreground(theme.CurrentTheme.Highlight).Render(k), v)
 	}
@@ -166,19 +166,19 @@ func renderHelpModal(_ AppModel, w int) string {
 	b.WriteString(" Runs directly in your flashtool directory. Use it for manual\n")
 	b.WriteString(" adb shell commands or custom fastboot flags.\n")
 
-	b.WriteString(fmt.Sprintf("\n%s", theme.GetDimStyle().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core")))
+	b.WriteString(fmt.Sprintf("\n%s", theme.DimStyle.Copy().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core")))
 	
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
 func renderSettingsModal(m AppModel, w, _ int) string {
-	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("APPLICATION CONFIGURATION")
+	title := theme.TitleStyle.Copy().Width(w - 4).Align(lipgloss.Center).Render("APPLICATION CONFIGURATION")
 	var b strings.Builder
 	innerW := w - 6
 
 	renderItem := func(index int, label, desc, pathVal string) {
-		b.WriteString(fmt.Sprintf(" %s\n", theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Render(label)))
-		b.WriteString(fmt.Sprintf("  %s\n", theme.GetDimStyle().Render(desc)))
+		b.WriteString(fmt.Sprintf(" %s\n", theme.TitleStyle.Copy().Foreground(theme.CurrentTheme.Highlight).Render(label)))
+		b.WriteString(fmt.Sprintf("  %s\n", theme.DimStyle.Copy().Render(desc)))
 		
 		pad := "  "
 		if m.Modal.SettingsCursor == index {
@@ -192,8 +192,8 @@ func renderSettingsModal(m AppModel, w, _ int) string {
 		b.WriteString(fmt.Sprintf("%s%s\n\n", pad, pathStr))
 	}
 
-	renderItem(0, "📂 Base ROM Directory", "The root folder where your custom ROMs and images are stored.", m.Config.BaseDir)
-	renderItem(1, "📱 Target Device Folder", "Default folder structure path for the current device.", m.Config.DevicePath)
+	renderItem(0, "📂 Base ROM Directory", "The root folder where your custom ROMs and images are stored.", m.App.Config.BaseDir)
+	renderItem(1, "📱 Target Device Folder", "Default folder structure path for the current device.", m.App.Config.DevicePath)
 	
 	for i := 0; i < 1; i++ { b.WriteByte('\n') }
 	
@@ -206,7 +206,7 @@ func renderSettingsModal(m AppModel, w, _ int) string {
 	b.WriteString(saveBtn)
 	b.WriteString("\n\n")
 
-	fLeft, fRight := theme.GetDimStyle().Render(" TAB Nav • ↵ SELECT "), theme.GetDimStyle().Render(" ESC CANCEL ")
+	fLeft, fRight := theme.DimStyle.Copy().Render(" TAB Nav • ↵ SELECT "), theme.DimStyle.Copy().Render(" ESC CANCEL ")
 	spaceCount := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 8
 	if spaceCount < 0 { spaceCount = 0 }
 	footer := lipgloss.JoinHorizontal(lipgloss.Bottom, fLeft, strings.Repeat(" ", spaceCount), fRight)

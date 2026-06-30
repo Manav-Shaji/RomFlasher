@@ -32,38 +32,14 @@ var CurrentTheme = Theme{
 	Border:     lipgloss.Color("#555555"),
 }
 
-func GetTitleStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Bold(true)
-}
-
-func GetDimStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(CurrentTheme.Dim)
-}
-
-func GetBaseStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(CurrentTheme.Foreground)
-}
-
-func GetBorderStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(CurrentTheme.Border)
-}
-
-func GetHUDLabelStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(CurrentTheme.Dim).Bold(true)
-}
-
-func GetHUDValueStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(CurrentTheme.Highlight).Bold(true)
-}
-
-func GetSeparatorStyle() lipgloss.Style {
-	return lipgloss.NewStyle().BorderForeground(CurrentTheme.Dim)
-}
-
-func GetSelectedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Bold(true)
-}
-
-func GetBadgeStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Padding(0, 1).Bold(true)
-}
+var (
+	TitleStyle     = lipgloss.NewStyle().Bold(true)
+	DimStyle       = lipgloss.NewStyle().Foreground(CurrentTheme.Dim)
+	BaseStyle      = lipgloss.NewStyle().Foreground(CurrentTheme.Foreground)
+	BorderStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(CurrentTheme.Border)
+	HUDLabelStyle  = lipgloss.NewStyle().Foreground(CurrentTheme.Dim).Bold(true)
+	HUDValueStyle  = lipgloss.NewStyle().Foreground(CurrentTheme.Highlight).Bold(true)
+	SeparatorStyle = lipgloss.NewStyle().BorderForeground(CurrentTheme.Dim)
+	SelectedStyle  = lipgloss.NewStyle().Bold(true)
+	BadgeStyle     = lipgloss.NewStyle().Padding(0, 1).Bold(true)
+)

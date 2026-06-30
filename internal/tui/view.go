@@ -3,7 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"flashtool/internal/core"
+	"flashtool/internal/domain"
 	"github.com/charmbracelet/lipgloss"
 	"flashtool/internal/tui/theme"
 )
@@ -68,7 +68,7 @@ func renderHeader(m AppModel) string {
 	t3 := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render(line3)
 
 	// 2. HUD Badges
-	badge := theme.GetBadgeStyle()
+	badge := theme.BadgeStyle.Copy()
 	
 	metadata := lipgloss.JoinHorizontal(lipgloss.Center,
 		badge.Copy().Background(theme.CurrentTheme.Accent).Foreground(theme.CurrentTheme.Background).Render(" VOID "),
@@ -109,12 +109,12 @@ func renderMenu(m AppModel, width, height int) string {
 	
 	b.WriteString(header)
 	b.WriteByte('\n')
-	b.WriteString(theme.GetSeparatorStyle().Render(strings.Repeat("─", width-2)))
+	b.WriteString(theme.SeparatorStyle.Copy().Render(strings.Repeat("─", width-2)))
 	b.WriteByte('\n')
 
 	// Menu Items
-	itemStyle := theme.GetBaseStyle().Width(width - 2)
-	selStyle := theme.GetSelectedStyle().Width(width - 2).Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Highlight)
+	itemStyle := theme.BaseStyle.Copy().Width(width - 2)
+	selStyle := theme.SelectedStyle.Copy().Width(width - 2).Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Highlight)
 
 	for i := 0; i < len(m.Menu); i++ {
 		it := m.Menu[i]
@@ -135,10 +135,10 @@ func renderMenu(m AppModel, width, height int) string {
 		b.WriteString(strings.Repeat("\n", fillCount))
 	}
 
-	footer := theme.GetDimStyle().Width(width-2).Align(lipgloss.Center).Render("↑/↓ Nav • ↵ Run")
+	footer := theme.DimStyle.Copy().Width(width-2).Align(lipgloss.Center).Render("↑/↓ Nav • ↵ Run")
 	b.WriteString(footer)
 
-	return theme.GetBorderStyle().BorderForeground(theme.CurrentTheme.Accent).Width(width - 2).Height(height).Render(b.String())
+	return theme.BorderStyle.Copy().BorderForeground(theme.CurrentTheme.Accent).Width(width - 2).Height(height).Render(b.String())
 }
 
 /* ───────────────────────────────
@@ -157,9 +157,9 @@ func renderDetails(m AppModel, width, height int) string {
 		body = renderConfirmView(m, width)
 	case m.Busy:
 		body = renderBusyView(m, width)
-	case m.Device.Mode == core.ModeUnauthorized:
+	case m.Device.Mode == domain.ModeUnauthorized:
 		body = renderUnauthorizedView(width)
-	case m.Device.Mode != core.ModeDisconnected && m.Device.Mode != core.ModeOffline:
+	case m.Device.Mode != domain.ModeDisconnected && m.Device.Mode != domain.ModeOffline:
 		body = renderDeviceHUD(m, width)
 	default:
 		body = renderInfoView(m, width)
@@ -174,7 +174,7 @@ func renderDetails(m AppModel, width, height int) string {
 	
 	content := lipgloss.JoinVertical(lipgloss.Left, body, "", logTitle, m.UI.Viewport.View())
 	
-	return theme.GetBorderStyle().BorderForeground(theme.CurrentTheme.Highlight).Width(width - 2).Height(height).Render(content)
+	return theme.BorderStyle.Copy().BorderForeground(theme.CurrentTheme.Highlight).Width(width - 2).Height(height).Render(content)
 }
 
 /* ───────────────────────────────
@@ -194,13 +194,13 @@ func renderStatusBar(m AppModel, width int) string {
 
 	modeBg, modeFg, modeIcon := theme.CurrentTheme.Dim, theme.CurrentTheme.Foreground, "⚠"
 	switch m.Device.Mode {
-	case core.ModeFastboot: 
+	case domain.ModeFastboot: 
 		modeBg, modeFg, modeIcon = theme.CurrentTheme.Highlight, theme.CurrentTheme.Background, "⚡"
-	case core.ModeRecovery, core.ModeDevice, core.ModeSideload: 
+	case domain.ModeRecovery, domain.ModeDevice, domain.ModeSideload: 
 		modeBg, modeFg, modeIcon = theme.CurrentTheme.Success, theme.CurrentTheme.Background, "📱"
-	case core.ModeUnauthorized:
+	case domain.ModeUnauthorized:
 		modeBg, modeFg, modeIcon = theme.CurrentTheme.Error, theme.CurrentTheme.Background, "📵"
-	case core.ModeOffline:
+	case domain.ModeOffline:
 		modeBg, modeFg, modeIcon = theme.CurrentTheme.Dim, theme.CurrentTheme.Foreground, "💤"
 	}
 
@@ -237,9 +237,9 @@ func renderToast(t *Toast) string {
 	label := "INFO"
 
 	switch t.Type {
-	case core.LogError:
+	case domain.LogError:
 		bg, icon, label = theme.CurrentTheme.Error, "❌", "ERROR"
-	case core.LogSuccess:
+	case domain.LogSuccess:
 		bg, icon, label = theme.CurrentTheme.Success, "✅", "SUCCESS"
 	}
 

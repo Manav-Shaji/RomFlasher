@@ -23,3 +23,6 @@ go.work.sum
 
 # App settings
 config.json
+
+# Runtime logs
+logs/
