@@ -1,6 +1,8 @@
-package internal
+package tui
 
 import (
+	"flashtool/internal/core"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +12,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-	"flashtool/internal/ui"
+	"flashtool/internal/tui/theme"
 )
 
 /* MESSAGES */
@@ -33,8 +35,8 @@ type SettingsFolderSelectedMsg struct {
 
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
-		PollDeviceCmd(),
-		WaitForLogs(LogChan),
+		core.PollDeviceCmd(),
+		core.WaitForLogs(core.LogChan),
 		textinput.Blink,
 	)
 }
@@ -49,21 +51,20 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 
-	case HeartbeatMsg:
+	case core.HeartbeatMsg:
 		m.Tick++
-		return m, HeartbeatCmd()
+		return m, core.HeartbeatCmd()
 
-	case PollMsg:
+	case core.PollMsg:
 		return m.handlePollMsg(msg)
 
-	case DeviceUpdateMsg:
+	case core.DeviceUpdateMsg:
 		return m.handleDeviceUpdate(msg)
 
-	case LogMsg:
+	case core.LogMsg:
 		return m.handleLogMsg(msg)
 
-	case TaskCompleteMsg:
-
+	case core.TaskCompleteMsg:
 		return m.handleTaskComplete(msg)
 
 	case ToastTimeoutMsg:
@@ -112,21 +113,21 @@ func toastTimeoutCmd(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return ToastTimeoutMsg{} })
 }
 
-func RenderLogsStr(logs []LogEntry, width int) string {
+func RenderLogsStr(logs []core.LogEntry, width int) string {
 	var b strings.Builder
 	for _, l := range logs {
 		style := lipgloss.NewStyle().
-			Foreground(ui.CurrentTheme.Foreground).
+			Foreground(theme.CurrentTheme.Foreground).
 			Width(width).
 			PaddingRight(1)
 		
 		text := l.Text
 		
 		// 1. Level-based styling
-		if l.Level == LogError {
-			style = style.Foreground(ui.CurrentTheme.Error).Bold(true)
-		} else if l.Level == LogSuccess {
-			style = style.Foreground(ui.CurrentTheme.Success).Bold(true)
+		if l.Level == core.LogError {
+			style = style.Foreground(theme.CurrentTheme.Error).Bold(true)
+		} else if l.Level == core.LogSuccess {
+			style = style.Foreground(theme.CurrentTheme.Success).Bold(true)
 		}
 
 		// 2. Keyword Highlighting
@@ -134,15 +135,15 @@ func RenderLogsStr(logs []LogEntry, width int) string {
 			// It's a command
 			cmdPart := text
 			if strings.Contains(text, "adb") {
-				cmdPart = strings.Replace(text, "adb", lipgloss.NewStyle().Foreground(ui.CurrentTheme.Highlight).Bold(true).Render("adb"), 1)
+				cmdPart = strings.Replace(text, "adb", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render("adb"), 1)
 			} else if strings.Contains(text, "fastboot") {
-				cmdPart = strings.Replace(text, "fastboot", lipgloss.NewStyle().Foreground(ui.CurrentTheme.Accent).Bold(true).Render("fastboot"), 1)
+				cmdPart = strings.Replace(text, "fastboot", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Bold(true).Render("fastboot"), 1)
 			}
 			
 			// Highlight actions
 			for _, action := range []string{"flash", "sideload", "wipe-super", "reboot"} {
 				if strings.Contains(cmdPart, action) {
-					coloredAction := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Warning).Bold(true).Render(action)
+					coloredAction := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Warning).Bold(true).Render(action)
 					cmdPart = strings.Replace(cmdPart, action, coloredAction, 1)
 				}
 			}
@@ -151,9 +152,9 @@ func RenderLogsStr(logs []LogEntry, width int) string {
 
 		// 3. Status Highlights
 		if strings.Contains(text, "[ DONE ]") {
-			text = strings.Replace(text, "[ DONE ]", lipgloss.NewStyle().Foreground(ui.CurrentTheme.Success).Bold(true).Render("[ DONE ]"), 1)
+			text = strings.Replace(text, "[ DONE ]", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Success).Bold(true).Render("[ DONE ]"), 1)
 		} else if strings.Contains(text, "[ FAILED") {
-			text = strings.Replace(text, "[ FAILED", lipgloss.NewStyle().Foreground(ui.CurrentTheme.Error).Bold(true).Render("[ FAILED"), 1)
+			text = strings.Replace(text, "[ FAILED", lipgloss.NewStyle().Foreground(theme.CurrentTheme.Error).Bold(true).Render("[ FAILED"), 1)
 		}
 
 		b.WriteString(style.Render(text))
@@ -161,7 +162,6 @@ func RenderLogsStr(logs []LogEntry, width int) string {
 	}
 	return b.String()
 }
-
 
 func LoadFiles(dir, filter string) []FileItem {
 	entries, _ := os.ReadDir(dir)

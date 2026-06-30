@@ -1,6 +1,8 @@
-package internal
+package tui
 
 import (
+	"flashtool/internal/core"
+
 	"fmt"
 	"os"
 	"path/filepath"
@@ -119,7 +121,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.Modal.CustomViewport = viewport.New(0, 0)
 				m.Modal.CustomViewport.SetContent("Executing: " + val + "...")
 				m.UI.TextInput.Reset()
-				return m, RunCustomCommand(val)
+				return m, core.RunCustomCommand(val)
 			}
 		}
 
@@ -169,9 +171,9 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.DevicePath = m.Config.DevicePath
 				
 				if err != nil {
-					m.ActiveToast = &Toast{Message: "Save Failed", Type: LogError}
+					m.ActiveToast = &Toast{Message: "Save Failed", Type: core.LogError}
 				} else {
-					m.ActiveToast = &Toast{Message: "Settings Saved", Type: LogSuccess}
+					m.ActiveToast = &Toast{Message: "Settings Saved", Type: core.LogSuccess}
 				}
 				m.ActiveModal = ModalNone
 				return m, toastTimeoutCmd(3*time.Second)
@@ -195,7 +197,7 @@ func (m AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
 		if msg.String() == "ctrl+c" || msg.String() == "esc" { 
-			CancelActiveCommand()
+			core.CancelActiveCommand()
 			return m, nil 
 		}
 		return m, nil
@@ -215,15 +217,15 @@ func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m AppModel) handlePollMsg(msg PollMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handlePollMsg(msg core.PollMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
-		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return PollMsg(t) })
+		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return core.PollMsg(t) })
 	}
-	return m, tea.Batch(func() tea.Msg { return CheckDeviceState() }, PollDeviceCmd())
+	return m, tea.Batch(func() tea.Msg { return core.CheckDeviceState() }, core.PollDeviceCmd())
 }
 
-func (m AppModel) handleDeviceUpdate(msg DeviceUpdateMsg) (tea.Model, tea.Cmd) {
-	newDevice := DeviceState(msg)
+func (m AppModel) handleDeviceUpdate(msg core.DeviceUpdateMsg) (tea.Model, tea.Cmd) {
+	newDevice := core.DeviceState(msg)
 	newMode := newDevice.Mode
 	var cmds []tea.Cmd
 
@@ -231,21 +233,21 @@ func (m AppModel) handleDeviceUpdate(msg DeviceUpdateMsg) (tea.Model, tea.Cmd) {
 		m.IsRefreshing = false
 		displayMode := formatDeviceMode(newMode)
 
-		if newMode == ModeDisconnected {
-			m.ActiveToast = &Toast{Message: "Scan Finished: NO DEVICE", Type: LogInfo}
+		if newMode == core.ModeDisconnected {
+			m.ActiveToast = &Toast{Message: "Scan Finished: NO DEVICE", Type: core.LogInfo}
 		} else {
-			m.ActiveToast = &Toast{Message: fmt.Sprintf("Scan Complete: %s", displayMode), Type: LogSuccess}
+			m.ActiveToast = &Toast{Message: fmt.Sprintf("Scan Complete: %s", displayMode), Type: core.LogSuccess}
 		}
 		cmds = append(cmds, toastTimeoutCmd(3*time.Second))
 	} else if m.Device.Mode != newMode {
-		m.ActiveToast = &Toast{Message: fmt.Sprintf("Mode: %s", newMode), Type: LogInfo}
+		m.ActiveToast = &Toast{Message: fmt.Sprintf("Mode: %s", newMode), Type: core.LogInfo}
 		cmds = append(cmds, toastTimeoutCmd(3*time.Second))
 	}
 	m.Device = newDevice
 	return m, tea.Batch(cmds...)
 }
 
-func (m AppModel) handleLogMsg(msg LogMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handleLogMsg(msg core.LogMsg) (tea.Model, tea.Cmd) {
 	line := string(msg)
 
 
@@ -253,10 +255,10 @@ func (m AppModel) handleLogMsg(msg LogMsg) (tea.Model, tea.Cmd) {
 	isOverwrite := strings.HasPrefix(line, "\r")
 
 	cleanLine := strings.TrimPrefix(line, "\r")
-	if cleanLine == "" { return m, WaitForLogs(LogChan) }
+	if cleanLine == "" { return m, core.WaitForLogs(core.LogChan) }
 
 	level := parseLogLevel(cleanLine)
-	entry := LogEntry{Level: level, Text: cleanLine, Timestamp: time.Now()}
+	entry := core.LogEntry{Level: level, Text: cleanLine, Timestamp: time.Now()}
 
 	if m.ActiveModal == ModalCustom {
 		m.syncCustomLogs(entry, isOverwrite)
@@ -264,22 +266,22 @@ func (m AppModel) handleLogMsg(msg LogMsg) (tea.Model, tea.Cmd) {
 		m.syncMainLogs(entry, isOverwrite)
 	}
 
-	return m, tea.Batch(WaitForLogs(LogChan))
+	return m, tea.Batch(core.WaitForLogs(core.LogChan))
 }
 
-func (m AppModel) handleTaskComplete(msg TaskCompleteMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handleTaskComplete(msg core.TaskCompleteMsg) (tea.Model, tea.Cmd) {
 	m.Busy = false
 	status := "[ DONE ]"
 	if msg.Err != nil {
-		m.ActiveToast = &Toast{Message: "Failed", Type: LogError}
+		m.ActiveToast = &Toast{Message: "Failed", Type: core.LogError}
 		fmt.Print("\a\a")
 		status = fmt.Sprintf("[ FAILED: %v ]", msg.Err)
 	} else {
-		m.ActiveToast = &Toast{Message: "Success", Type: LogSuccess}
+		m.ActiveToast = &Toast{Message: "Success", Type: core.LogSuccess}
 		fmt.Print("\a")
 	}
 
-	entry := LogEntry{Text: status, Level: LogInfo, Timestamp: time.Now()}
+	entry := core.LogEntry{Text: status, Level: core.LogInfo, Timestamp: time.Now()}
 	m.Logs = append(m.Logs, entry)
 	
 	if m.ActiveModal == ModalCustom {
@@ -335,31 +337,31 @@ func (m AppModel) handleSetupMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 /* HELPERS */
 
-func formatDeviceMode(m DeviceMode) string {
+func formatDeviceMode(m core.DeviceMode) string {
 	switch m {
-	case ModeDevice:       return "ADB DEVICE"
-	case ModeSideload:     return "ADB SIDELOAD"
-	case ModeRecovery:     return "RECOVERY"
-	case ModeFastboot:     return "FASTBOOT"
-	case ModeDisconnected: return "NOT FOUND"
+	case core.ModeDevice:       return "ADB DEVICE"
+	case core.ModeSideload:     return "ADB SIDELOAD"
+	case core.ModeRecovery:     return "RECOVERY"
+	case core.ModeFastboot:     return "FASTBOOT"
+	case core.ModeDisconnected: return "NOT FOUND"
 	default:               return string(m)
 	}
 }
 
-func parseLogLevel(line string) LogLevel {
+func parseLogLevel(line string) core.LogLevel {
 	line = strings.ToUpper(line)
 	if strings.HasPrefix(line, "ERR:") || strings.HasPrefix(line, "ERROR:") || 
 	   strings.Contains(line, "FAILED") || strings.Contains(line, "CRITICAL") { 
-		return LogError 
+		return core.LogError 
 	}
 	if strings.HasPrefix(line, "OK") || strings.Contains(line, "SUCCESS") || 
 	   strings.HasPrefix(line, "FINISHED") {
-		return LogSuccess 
+		return core.LogSuccess 
 	}
-	return LogInfo
+	return core.LogInfo
 }
 
-func (m *AppModel) syncCustomLogs(entry LogEntry, overwrite bool) {
+func (m *AppModel) syncCustomLogs(entry core.LogEntry, overwrite bool) {
 	if overwrite && len(m.Modal.CustomLogs) > 0 {
 		m.Modal.CustomLogs[len(m.Modal.CustomLogs)-1] = entry
 	} else {
@@ -372,7 +374,7 @@ func (m *AppModel) syncCustomLogs(entry LogEntry, overwrite bool) {
 	m.Modal.CustomViewport.GotoBottom()
 }
 
-func (m *AppModel) syncMainLogs(entry LogEntry, overwrite bool) {
+func (m *AppModel) syncMainLogs(entry core.LogEntry, overwrite bool) {
 	if overwrite && len(m.Logs) > 0 {
 		last := m.Logs[len(m.Logs)-1]
 		if !strings.Contains(last.Text, ">") && !strings.Contains(strings.ToUpper(last.Text), "EXECUTION") {
@@ -426,40 +428,40 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		case "flash_rec":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					LogChan <- "> fastboot flash recovery " + filepath.Base(p)
+					core.LogChan <- "> fastboot flash recovery " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "Flash RECOVERY with: " + filepath.Base(p) + "?",
-						Cmd: FlashImage("recovery", p),
+						Cmd: core.FlashImage("recovery", p),
 					}
 				}
 			}
 		case "flash_boot":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					LogChan <- "> fastboot flash boot " + filepath.Base(p)
+					core.LogChan <- "> fastboot flash boot " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "Flash BOOT with: " + filepath.Base(p) + "?",
-						Cmd: FlashImage("boot", p),
+						Cmd: core.FlashImage("boot", p),
 					}
 				}
 			}
 		case "wipe_super":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					LogChan <- "> fastboot wipe-super " + filepath.Base(p)
+					core.LogChan <- "> fastboot wipe-super " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "WIPE SUPER and Flash: " + filepath.Base(p) + "?",
-						Cmd: WipeSuper(p),
+						Cmd: core.WipeSuper(p),
 					}
 				}
 			}
 		case "sideload":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					LogChan <- "> adb sideload " + filepath.Base(p)
+					core.LogChan <- "> adb sideload " + filepath.Base(p)
 					return SetupConfirmMsg{
-						Msg: "Sideload: " + filepath.Base(p) + "?",
-						Cmd: Sideload(p),
+						Msg: "core.Sideload: " + filepath.Base(p) + "?",
+						Cmd: core.Sideload(p),
 					}
 				}
 			}
@@ -471,21 +473,21 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 	case "rb_system":
 		m.ActiveModal, m.Modal.ConfirmMsg = ModalConfirm, "Reboot to System?"
 		m.Modal.OnConfirm = func() tea.Cmd {
-			LogChan <- "> rebooting to system..."
-			return RebootSystem(m.Device.Mode)
+			core.LogChan <- "> rebooting to system..."
+			return core.RebootSystem(m.Device.Mode)
 		}
 	case "rb_recovery":
 		m.ActiveModal, m.Modal.ConfirmMsg = ModalConfirm, "Reboot to Recovery?"
 		m.Modal.OnConfirm = func() tea.Cmd {
-			LogChan <- "> rebooting to recovery..."
-			return RebootRecovery(m.Device.Mode)
+			core.LogChan <- "> rebooting to recovery..."
+			return core.RebootRecovery(m.Device.Mode)
 		}
 	case "refresh":
 		m.IsRefreshing = true
-		m.ActiveToast = &Toast{Message: "Scanning for devices...", Type: LogInfo}
+		m.ActiveToast = &Toast{Message: "Scanning for devices...", Type: core.LogInfo}
 		return m, tea.Batch(
-			func() tea.Msg { return CheckDeviceState() },
-			PollDeviceCmd(),
+			func() tea.Msg { return core.CheckDeviceState() },
+			core.PollDeviceCmd(),
 			toastTimeoutCmd(2*time.Second),
 		)
 	case "help":

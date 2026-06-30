@@ -1,6 +1,8 @@
-package internal
+package tui
 
 import (
+	"flashtool/internal/core"
+
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -20,26 +22,6 @@ const (
 	ModalHelp
 	ModalCustom
 	ModalSettings
-)
-
-type DeviceMode string
-
-const (
-	ModeDisconnected DeviceMode = "DISCONNECTED"
-	ModeFastboot     DeviceMode = "FASTBOOT"
-	ModeDevice       DeviceMode = "DEVICE"
-	ModeRecovery     DeviceMode = "RECOVERY"
-	ModeSideload     DeviceMode = "SIDELOAD"
-	ModeUnauthorized DeviceMode = "UNAUTHORIZED"
-	ModeOffline      DeviceMode = "OFFLINE"
-)
-
-type LogLevel string
-
-const (
-	LogInfo    LogLevel = "INFO"
-	LogError   LogLevel = "ERROR"
-	LogSuccess LogLevel = "SUCCESS"
 )
 
 /* CONFIG MODELS */
@@ -66,26 +48,11 @@ type AppConfig struct {
 
 /* DATA MODELS */
 
-type LogEntry struct {
-	Level     LogLevel
-	Text      string
-	Timestamp time.Time
-}
-
 type MenuItem struct {
 	Label  string
 	Icon   string
 	Desc   string
 	Action string
-}
-
-type DeviceState struct {
-	Mode    DeviceMode
-	Serial  string
-	Model   string
-	Battery string
-	Slot    string
-	Secure  string
 }
 
 type FileItem struct {
@@ -96,7 +63,7 @@ type FileItem struct {
 
 type Toast struct {
 	Message string
-	Type    LogLevel
+	Type    core.LogLevel
 }
 
 /* APP MODEL */
@@ -111,7 +78,7 @@ type AppModel struct {
 	Tick          int // Pulsing animation tick
 
 	// 2. Device State
-	Device DeviceState
+	Device core.DeviceState
 
 	// 3. UI Components (Standard Bubbles)
 	UI struct {
@@ -133,7 +100,7 @@ type AppModel struct {
 		FileFilter   string
 		OnFileSelect func(string) tea.Cmd
 
-		CustomLogs     []LogEntry
+		CustomLogs     []core.LogEntry
 		CustomViewport viewport.Model
 		Width          int
 
@@ -142,7 +109,7 @@ type AppModel struct {
 	}
 
 	// 5. Feedback & Logs
-	Logs        []LogEntry
+	Logs        []core.LogEntry
 	ActiveToast *Toast
 
 	// 6. Config & Paths
@@ -158,18 +125,20 @@ type AppModel struct {
 
 func NewModel() AppModel {
 	m := AppModel{
-		Device: DeviceState{
-			Mode:    ModeDisconnected,
+		Device: core.DeviceState{
+			Mode:    core.ModeDisconnected,
 			Serial:  "-",
 			Model:   "-",
 			Battery: "-",
 			Slot:    "-",
 			Secure:  "-",
 		},
-		Logs: []LogEntry{
-			{Level: LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()},
+		Logs: []core.LogEntry{
+			{Level: core.LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()},
 		},
 	}
+	m.Menu = GetDefaultMenu()
+	m.SetupUI()
 	m.UI.Viewport = viewport.New(0, 0)
 	m.UI.Viewport.SetContent(RenderLogsStr(m.Logs, 0))
 	return m

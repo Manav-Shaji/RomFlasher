@@ -1,9 +1,9 @@
-package internal
+package tui
 
 import (
 	"fmt"
 	"strings"
-	"flashtool/internal/ui"
+	"flashtool/internal/tui/theme"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -17,7 +17,7 @@ func renderModal(m AppModel) string {
 	if m.ActiveModal == ModalCustom { h = 24 }
 	if m.ActiveModal == ModalSettings { h = 22 }
 	
-	style := ui.GetBorderStyle().Width(w).Height(h).Border(lipgloss.RoundedBorder()).BorderForeground(ui.CurrentTheme.Highlight)
+	style := theme.GetBorderStyle().Width(w).Height(h).Border(lipgloss.RoundedBorder()).BorderForeground(theme.CurrentTheme.Highlight)
 	
 	switch m.ActiveModal {
 	case ModalFile:
@@ -35,16 +35,16 @@ func renderModal(m AppModel) string {
 }
 
 func renderFileModal(m AppModel, w int) string {
-	title := ui.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render(m.Modal.FileTitle)
+	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render(m.Modal.FileTitle)
 	var b strings.Builder
 	
 	// Path Box
-	pathLabel := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Background).Background(ui.CurrentTheme.Highlight).Padding(0, 1).Bold(true).Render(" PATH ")
-	pathText := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Highlight).Italic(true).Render(" " + m.Modal.FileDir)
+	pathLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Highlight).Padding(0, 1).Bold(true).Render(" PATH ")
+	pathText := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Italic(true).Render(" " + m.Modal.FileDir)
 	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, pathLabel, pathText) + "\n\n")
 
 	// Search Box
-	searchLabel := lipgloss.NewStyle().Padding(0, 1).Background(ui.CurrentTheme.Accent).Foreground(ui.CurrentTheme.Background).Bold(true).Render(" 🔍 SEARCH ")
+	searchLabel := lipgloss.NewStyle().Padding(0, 1).Background(theme.CurrentTheme.Accent).Foreground(theme.CurrentTheme.Background).Bold(true).Render(" 🔍 SEARCH ")
 	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, searchLabel, " ", m.UI.TextInput.View()) + "\n\n")
 
 	start := 0
@@ -60,32 +60,32 @@ func renderFileModal(m AppModel, w int) string {
 		if len(name) > 40 { name = name[:37] + "..." }
 		if i == m.Modal.FileCursor {
 			barWidth := w - 8
-			b.WriteString(ui.GetSelectedStyle().Width(barWidth).Background(ui.CurrentTheme.Highlight).Foreground(ui.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)) + "\n")
+			b.WriteString(theme.GetSelectedStyle().Width(barWidth).Background(theme.CurrentTheme.Highlight).Foreground(theme.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)) + "\n")
 		} else {
-			s := ui.GetBaseStyle()
-			if f.Name == "[ SELECT THIS FOLDER ]" { s = s.Foreground(ui.CurrentTheme.Highlight).Bold(true) }
+			s := theme.GetBaseStyle()
+			if f.Name == "[ SELECT THIS FOLDER ]" { s = s.Foreground(theme.CurrentTheme.Highlight).Bold(true) }
 			b.WriteString(fmt.Sprintf("   %s  %s\n", icon, s.Render(name)))
 		}
 	}
 	for i := 0; i < (10 - (end - start)); i++ { b.WriteString("\n") }
-	fLeft := ui.GetDimStyle().Render(fmt.Sprintf(" %d items match", len(m.Modal.FileList)))
-	fRight := ui.GetDimStyle().Render("↑/↓ Nav • ↵ Open • Esc Back ")
+	fLeft := theme.GetDimStyle().Render(fmt.Sprintf(" %d items match", len(m.Modal.FileList)))
+	fRight := theme.GetDimStyle().Render("↑/↓ Nav • ↵ Open • Esc Back ")
 	space := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 4
 	b.WriteString("\n" + fLeft + strings.Repeat(" ", space) + fRight)
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
 func renderCustomModal(m AppModel, w, h int) string {
-	title := ui.GetTitleStyle().
-		Background(ui.CurrentTheme.Highlight).
-		Foreground(ui.CurrentTheme.Background).
+	title := theme.GetTitleStyle().
+		Background(theme.CurrentTheme.Highlight).
+		Foreground(theme.CurrentTheme.Background).
 		Width(w - 4).
 		Align(lipgloss.Center).
 		Render(" COMMAND CONSOLE ")
 	var b strings.Builder
 	innerW := w - 6
 	// 1. Output Panel
-	outputTitle := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Highlight).Bold(true).Render("🖥️  OUTPUT")
+	outputTitle := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render("🖥️  OUTPUT")
 	b.WriteString(outputTitle + "\n")
 	
 	m.Modal.CustomViewport.Width = innerW
@@ -93,12 +93,12 @@ func renderCustomModal(m AppModel, w, h int) string {
 	
 	outputContent := m.Modal.CustomViewport.View()
 	if len(m.Modal.CustomLogs) == 0 && !m.Busy {
-		outputContent = ui.GetDimStyle().Italic(true).Render("\n\n  Terminal initialized. Enter command below...")
+		outputContent = theme.GetDimStyle().Italic(true).Render("\n\n  Terminal initialized. Enter command below...")
 	}
 	
 	outputBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.CurrentTheme.Dim).
+		BorderForeground(theme.CurrentTheme.Dim).
 		Width(innerW).
 		Height(11).
 		Padding(0, 1).
@@ -106,10 +106,10 @@ func renderCustomModal(m AppModel, w, h int) string {
 	b.WriteString(outputBox + "\n")
 
 	// 2. Input Panel
-	inputLabel := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Background).Background(ui.CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
-	m.UI.TextInput.Prompt = lipgloss.NewStyle().Foreground(ui.CurrentTheme.Accent).Render(" ❯ ")
+	inputLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
+	m.UI.TextInput.Prompt = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Render(" ❯ ")
 	inputField := m.UI.TextInput.View()
-	if m.Busy { inputField = ui.GetDimStyle().Render("Executing command... ⚡") }
+	if m.Busy { inputField = theme.GetDimStyle().Render("Executing command... ⚡") }
 	
 	inputLine := lipgloss.JoinHorizontal(lipgloss.Left, inputLabel, " ", inputField)
 	inputBox := lipgloss.NewStyle().Background(lipgloss.Color("#1a1a2e")).Width(innerW).Padding(0, 1).Render(inputLine)
@@ -117,12 +117,12 @@ func renderCustomModal(m AppModel, w, h int) string {
 
 	
 	// 3. Footer
-	examples := ui.GetDimStyle().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
+	examples := theme.GetDimStyle().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
 	if len(m.Modal.CustomLogs) > 0 || m.Busy {
-		examples = ui.GetDimStyle().Render(fmt.Sprintf(" History: %d lines", len(m.Modal.CustomLogs)))
+		examples = theme.GetDimStyle().Render(fmt.Sprintf(" History: %d lines", len(m.Modal.CustomLogs)))
 	}
 
-	fLeft, fRight := examples, ui.GetDimStyle().Render("↵ EXECUTE  •  ESC EXIT ")
+	fLeft, fRight := examples, theme.GetDimStyle().Render("↵ EXECUTE  •  ESC EXIT ")
 	spaceCount := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 8
 	if spaceCount < 0 { spaceCount = 0 }
 	
@@ -133,10 +133,10 @@ func renderCustomModal(m AppModel, w, h int) string {
 }
 
 func renderHelpModal(m AppModel, w int) string {
-	title := ui.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("SYSTEM DOCUMENTATION")
-	hl := ui.GetTitleStyle().Foreground(ui.CurrentTheme.Highlight).Width(w - 8).Align(lipgloss.Center)
+	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("SYSTEM DOCUMENTATION")
+	hl := theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Width(w - 8).Align(lipgloss.Center)
 	row := func(k, v string) string {
-		return fmt.Sprintf(" %s %s\n", lipgloss.NewStyle().Width(18).Foreground(ui.CurrentTheme.Highlight).Render(k), v)
+		return fmt.Sprintf(" %s %s\n", lipgloss.NewStyle().Width(18).Foreground(theme.CurrentTheme.Highlight).Render(k), v)
 	}
 
 	var b strings.Builder
@@ -159,29 +159,29 @@ func renderHelpModal(m AppModel, w int) string {
 	b.WriteString(" Runs directly in your flashtool directory. Use it for manual\n")
 	b.WriteString(" adb shell commands or custom fastboot flags.\n")
 
-	b.WriteString("\n" + ui.GetDimStyle().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core"))
+	b.WriteString("\n" + theme.GetDimStyle().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core"))
 	
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
 func renderSettingsModal(m AppModel, w, h int) string {
-	title := ui.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("APPLICATION CONFIGURATION")
+	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("APPLICATION CONFIGURATION")
 	var b strings.Builder
 	innerW := w - 6
 
 	renderItem := func(index int, label, desc, pathVal string) {
-		b.WriteString(" " + ui.GetTitleStyle().Foreground(ui.CurrentTheme.Highlight).Render(label) + "\n")
-		b.WriteString("  " + ui.GetDimStyle().Render(desc) + "\n")
+		b.WriteString(" " + theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Render(label) + "\n")
+		b.WriteString("  " + theme.GetDimStyle().Render(desc) + "\n")
 		
 		pad := "  "
 		if m.Modal.SettingsCursor == index {
-			pad = lipgloss.NewStyle().Foreground(ui.CurrentTheme.Accent).Render("❯ ")
+			pad = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Render("❯ ")
 		}
 		
 		val := pathVal
 		if val == "" { val = "(NOT SET)" }
 		
-		pathStr := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Foreground).Render(val)
+		pathStr := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Foreground).Render(val)
 		b.WriteString(pad + pathStr + "\n\n")
 	}
 
@@ -191,14 +191,14 @@ func renderSettingsModal(m AppModel, w, h int) string {
 	for i := 0; i < 1; i++ { b.WriteString("\n") }
 	
 	saveLabel := "  [ SAVE AND APPLY CONFIGURATION ]  "
-	saveStyle := lipgloss.NewStyle().Foreground(ui.CurrentTheme.Dim)
+	saveStyle := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Dim)
 	if m.Modal.SettingsCursor == 2 {
-		saveStyle = lipgloss.NewStyle().Foreground(ui.CurrentTheme.Background).Background(ui.CurrentTheme.Accent).Bold(true)
+		saveStyle = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true)
 	}
 	saveBtn := lipgloss.NewStyle().Width(innerW).Align(lipgloss.Center).Render(saveStyle.Render(saveLabel))
 	b.WriteString(saveBtn + "\n\n")
 
-	fLeft, fRight := ui.GetDimStyle().Render(" TAB Nav • ↵ SELECT "), ui.GetDimStyle().Render(" ESC CANCEL ")
+	fLeft, fRight := theme.GetDimStyle().Render(" TAB Nav • ↵ SELECT "), theme.GetDimStyle().Render(" ESC CANCEL ")
 	spaceCount := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 8
 	if spaceCount < 0 { spaceCount = 0 }
 	footer := lipgloss.JoinHorizontal(lipgloss.Bottom, fLeft, strings.Repeat(" ", spaceCount), fRight)
