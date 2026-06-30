@@ -2,6 +2,7 @@ package tui
 
 import (
 	"flashtool/internal/core"
+	"flashtool/internal/config"
 
 	"time"
 
@@ -24,27 +25,7 @@ const (
 	ModalSettings
 )
 
-/* CONFIG MODELS */
 
-type PickerConfig struct {
-	Title  string `json:"title"`
-	Filter string `json:"filter"`
-	SubDir string `json:"sub_dir"`
-}
-
-type MenuConfig struct {
-	Label  string        `json:"label"`
-	Icon   string        `json:"icon"`
-	Desc   string        `json:"desc"`
-	Action string        `json:"action"`
-	Picker *PickerConfig `json:"picker,omitempty"`
-}
-
-type AppConfig struct {
-	BaseDir    string            `json:"base_dir"`
-	DevicePath string            `json:"device_path,omitempty"`
-	Folders    map[string]string `json:"folders"`
-}
 
 /* DATA MODELS */
 
@@ -76,6 +57,8 @@ type AppModel struct {
 	Busy          bool
 	ActiveModal   ModalType
 	Tick          int // Pulsing animation tick
+
+	Engine        *core.Engine
 
 	// 2. Device State
 	Device core.DeviceState
@@ -113,7 +96,7 @@ type AppModel struct {
 	ActiveToast *Toast
 
 	// 6. Config & Paths
-	Config     AppConfig
+	Config     config.AppConfig
 	BaseDir    string
 	DevicePath string
 
@@ -124,7 +107,12 @@ type AppModel struct {
 /* FACTORY */
 
 func NewModel() AppModel {
+	cfg := config.LoadConfig()
 	m := AppModel{
+		Engine: core.NewEngine(),
+		Config: cfg,
+		BaseDir: cfg.BaseDir,
+		DevicePath: cfg.DevicePath,
 		Device: core.DeviceState{
 			Mode:    core.ModeDisconnected,
 			Serial:  "-",

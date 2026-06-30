@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"encoding/json"
-	"os"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -32,10 +30,3 @@ func (m *AppModel) SetupUI() {
 	m.UI.TextInput.Width = 40
 }
 
-func SaveConfig(config AppConfig) error {
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile("config.json", data, 0644)
-}

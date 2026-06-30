@@ -2,6 +2,7 @@ package tui
 
 import (
 	"flashtool/internal/core"
+	"flashtool/internal/config"
 
 	"fmt"
 	"os"
@@ -41,7 +42,8 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	if m.ActiveModal == ModalFile {
+	switch m.ActiveModal {
+	case ModalFile:
 		oldVal := m.UI.TextInput.Value()
 		newTi, tiCmd := m.UI.TextInput.Update(msg)
 		m.UI.TextInput = newTi
@@ -62,7 +64,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.Modal.FileCursor = 0
 		}
-	} else if m.ActiveModal == ModalCustom {
+	case ModalCustom:
 		if !m.Busy {
 			newTi, tiCmd := m.UI.TextInput.Update(msg)
 			m.UI.TextInput = newTi
@@ -72,12 +74,12 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch m.ActiveModal {
 	case ModalConfirm:
-		key := strings.ToLower(msg.String())
-		if key == "y" || key == "enter" {
+		switch strings.ToLower(msg.String()) {
+		case "y", "enter":
 			m.ActiveModal, m.Busy = ModalNone, true
 			m.UI.TextInput.Blur()
 			if m.Modal.OnConfirm != nil { return m, m.Modal.OnConfirm() }
-		} else if key == "n" || key == "esc" {
+		case "n", "esc":
 			m.ActiveModal = ModalNone
 			m.UI.TextInput.Blur()
 		}
@@ -121,7 +123,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.Modal.CustomViewport = viewport.New(0, 0)
 				m.Modal.CustomViewport.SetContent("Executing: " + val + "...")
 				m.UI.TextInput.Reset()
-				return m, core.RunCustomCommand(val)
+				return m, m.Engine.RunCustomCommand(val)
 			}
 		}
 
@@ -135,7 +137,8 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "down", "j", "tab":
 			if m.Modal.SettingsCursor < 2 { m.Modal.SettingsCursor++ }
 		case "enter":
-			if m.Modal.SettingsCursor == 0 {
+			switch m.Modal.SettingsCursor {
+			case 0:
 				m.ActiveModal = ModalFile
 				m.Modal.FileTitle = "SELECT BASE ROM DIRECTORY"
 				m.Modal.FileDir = m.Config.BaseDir
@@ -148,7 +151,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					return func() tea.Msg { return SettingsFolderSelectedMsg{Index: 0, Path: path} }
 				}
 				return m, m.UI.TextInput.Focus()
-			} else if m.Modal.SettingsCursor == 1 {
+			case 1:
 				m.ActiveModal = ModalFile
 				m.Modal.FileTitle = "SELECT DEVICE FOLDER"
 				m.Modal.FileDir = m.Config.DevicePath
@@ -165,8 +168,8 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					return func() tea.Msg { return SettingsFolderSelectedMsg{Index: 1, Path: path} }
 				}
 				return m, m.UI.TextInput.Focus()
-			} else if m.Modal.SettingsCursor == 2 {
-				err := SaveConfig(m.Config)
+			case 2:
+				err := config.SaveConfig(m.Config)
 				m.BaseDir = m.Config.BaseDir
 				m.DevicePath = m.Config.DevicePath
 				
@@ -197,7 +200,7 @@ func (m AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
 		if msg.String() == "ctrl+c" || msg.String() == "esc" { 
-			core.CancelActiveCommand()
+			m.Engine.CancelActiveCommand()
 			return m, nil 
 		}
 		return m, nil
@@ -217,7 +220,7 @@ func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m AppModel) handlePollMsg(msg core.PollMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handlePollMsg(_ core.PollMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
 		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return core.PollMsg(t) })
 	}
@@ -255,7 +258,7 @@ func (m AppModel) handleLogMsg(msg core.LogMsg) (tea.Model, tea.Cmd) {
 	isOverwrite := strings.HasPrefix(line, "\r")
 
 	cleanLine := strings.TrimPrefix(line, "\r")
-	if cleanLine == "" { return m, core.WaitForLogs(core.LogChan) }
+	if cleanLine == "" { return m, m.Engine.WaitForLogs() }
 
 	level := parseLogLevel(cleanLine)
 	entry := core.LogEntry{Level: level, Text: cleanLine, Timestamp: time.Now()}
@@ -266,7 +269,7 @@ func (m AppModel) handleLogMsg(msg core.LogMsg) (tea.Model, tea.Cmd) {
 		m.syncMainLogs(entry, isOverwrite)
 	}
 
-	return m, tea.Batch(core.WaitForLogs(core.LogChan))
+	return m, tea.Batch(m.Engine.WaitForLogs())
 }
 
 func (m AppModel) handleTaskComplete(msg core.TaskCompleteMsg) (tea.Model, tea.Cmd) {
@@ -324,9 +327,10 @@ func (m AppModel) handleSetupMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case SettingsFolderSelectedMsg:
-		if msg.Index == 0 {
+		switch msg.Index {
+		case 0:
 			m.Config.BaseDir = msg.Path
-		} else if msg.Index == 1 {
+		case 1:
 			m.Config.DevicePath = msg.Path
 		}
 		m.ActiveModal = ModalSettings
@@ -428,40 +432,40 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		case "flash_rec":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					core.LogChan <- "> fastboot flash recovery " + filepath.Base(p)
+					m.Engine.LogChan <- "> fastboot flash recovery " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "Flash RECOVERY with: " + filepath.Base(p) + "?",
-						Cmd: core.FlashImage("recovery", p),
+						Cmd: m.Engine.FlashImage("recovery", p),
 					}
 				}
 			}
 		case "flash_boot":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					core.LogChan <- "> fastboot flash boot " + filepath.Base(p)
+					m.Engine.LogChan <- "> fastboot flash boot " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "Flash BOOT with: " + filepath.Base(p) + "?",
-						Cmd: core.FlashImage("boot", p),
+						Cmd: m.Engine.FlashImage("boot", p),
 					}
 				}
 			}
 		case "wipe_super":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					core.LogChan <- "> fastboot wipe-super " + filepath.Base(p)
+					m.Engine.LogChan <- "> fastboot wipe-super " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "WIPE SUPER and Flash: " + filepath.Base(p) + "?",
-						Cmd: core.WipeSuper(p),
+						Cmd: m.Engine.WipeSuper(p),
 					}
 				}
 			}
 		case "sideload":
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
 				return func() tea.Msg {
-					core.LogChan <- "> adb sideload " + filepath.Base(p)
+					m.Engine.LogChan <- "> adb sideload " + filepath.Base(p)
 					return SetupConfirmMsg{
 						Msg: "core.Sideload: " + filepath.Base(p) + "?",
-						Cmd: core.Sideload(p),
+						Cmd: m.Engine.Sideload(p),
 					}
 				}
 			}
@@ -473,14 +477,14 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 	case "rb_system":
 		m.ActiveModal, m.Modal.ConfirmMsg = ModalConfirm, "Reboot to System?"
 		m.Modal.OnConfirm = func() tea.Cmd {
-			core.LogChan <- "> rebooting to system..."
-			return core.RebootSystem(m.Device.Mode)
+			m.Engine.LogChan <- "> rebooting to system..."
+			return m.Engine.RebootSystem(m.Device.Mode)
 		}
 	case "rb_recovery":
 		m.ActiveModal, m.Modal.ConfirmMsg = ModalConfirm, "Reboot to Recovery?"
 		m.Modal.OnConfirm = func() tea.Cmd {
-			core.LogChan <- "> rebooting to recovery..."
-			return core.RebootRecovery(m.Device.Mode)
+			m.Engine.LogChan <- "> rebooting to recovery..."
+			return m.Engine.RebootRecovery(m.Device.Mode)
 		}
 	case "refresh":
 		m.IsRefreshing = true

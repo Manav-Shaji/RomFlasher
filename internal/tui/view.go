@@ -107,8 +107,10 @@ func renderMenu(m AppModel, width, height int) string {
 		Width(width - 2).Align(lipgloss.Center).Bold(true).
 		Render(" ❯❯ COMMANDS ")
 	
-	b.WriteString(header + "\n")
-	b.WriteString(theme.GetSeparatorStyle().Render(strings.Repeat("─", width-2)) + "\n")
+	b.WriteString(header)
+	b.WriteByte('\n')
+	b.WriteString(theme.GetSeparatorStyle().Render(strings.Repeat("─", width-2)))
+	b.WriteByte('\n')
 
 	// Menu Items
 	itemStyle := theme.GetBaseStyle().Width(width - 2)
@@ -120,7 +122,8 @@ func renderMenu(m AppModel, width, height int) string {
 		if i == m.Selection {
 			prefix, style = " ❯ ", selStyle
 		}
-		b.WriteString(style.Render(fmt.Sprintf("%s%s %s", prefix, it.Icon, it.Label)) + "\n")
+		b.WriteString(style.Render(fmt.Sprintf("%s%s %s", prefix, it.Icon, it.Label)))
+		b.WriteByte('\n')
 	}
 
 	// Vertical Fill

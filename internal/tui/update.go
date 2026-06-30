@@ -36,7 +36,7 @@ type SettingsFolderSelectedMsg struct {
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
 		core.PollDeviceCmd(),
-		core.WaitForLogs(core.LogChan),
+		m.Engine.WaitForLogs(),
 		textinput.Blink,
 	)
 }
@@ -124,9 +124,10 @@ func RenderLogsStr(logs []core.LogEntry, width int) string {
 		text := l.Text
 		
 		// 1. Level-based styling
-		if l.Level == core.LogError {
+		switch l.Level {
+		case core.LogError:
 			style = style.Foreground(theme.CurrentTheme.Error).Bold(true)
-		} else if l.Level == core.LogSuccess {
+		case core.LogSuccess:
 			style = style.Foreground(theme.CurrentTheme.Success).Bold(true)
 		}
 

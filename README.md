@@ -1,6 +1,6 @@
-# VoidFlasher PRIME
+# NexForge
 
-VoidFlasher PRIME is a production-grade, highly reliable Android flashing terminal utility. Built with Go, Bubble Tea, and strict safety validation at its core, it brings OEM-level safety checks into a modern cyberpunk-themed terminal UI.
+NexForge is a production-grade, highly reliable Android flashing terminal utility. Built with Go, Bubble Tea, and strict safety validation at its core, it brings OEM-level safety checks into a modern cyberpunk-themed terminal UI.
 
 ## Features
 - **Un-bypassable Safety Engine**: Performs rigorous pre-flight checks (connection, device mode, battery level, SHA256 validation) before executing *any* command.
@@ -17,7 +17,7 @@ Download the latest pre-compiled binaries for Windows, Linux, or macOS from the 
 2. Clone the repository: `git clone https://github.com/Manav-Shaji/RomFlasher.git`
 3. Build the binary:
    ```sh
-   go build -o VoidFlasher ./cmd/flashtool
+   go build -o NexForge.exe ./cmd/flashtool
    ```
 
 ## Development

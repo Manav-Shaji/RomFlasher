@@ -22,7 +22,7 @@ func renderConfirmView(m AppModel, width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, box)
 }
 
-func renderBusyView(m AppModel, width int) string {
+func renderBusyView(_ AppModel, _ int) string {
 	return "" 
 }
 

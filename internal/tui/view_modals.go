@@ -41,11 +41,13 @@ func renderFileModal(m AppModel, w int) string {
 	// Path Box
 	pathLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Highlight).Padding(0, 1).Bold(true).Render(" PATH ")
 	pathText := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Italic(true).Render(" " + m.Modal.FileDir)
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, pathLabel, pathText) + "\n\n")
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, pathLabel, pathText))
+	b.WriteString("\n\n")
 
 	// Search Box
 	searchLabel := lipgloss.NewStyle().Padding(0, 1).Background(theme.CurrentTheme.Accent).Foreground(theme.CurrentTheme.Background).Bold(true).Render(" 🔍 SEARCH ")
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, searchLabel, " ", m.UI.TextInput.View()) + "\n\n")
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, searchLabel, " ", m.UI.TextInput.View()))
+	b.WriteString("\n\n")
 
 	start := 0
 	if m.Modal.FileCursor > 8 { start = m.Modal.FileCursor - 8 }
@@ -60,22 +62,23 @@ func renderFileModal(m AppModel, w int) string {
 		if len(name) > 40 { name = name[:37] + "..." }
 		if i == m.Modal.FileCursor {
 			barWidth := w - 8
-			b.WriteString(theme.GetSelectedStyle().Width(barWidth).Background(theme.CurrentTheme.Highlight).Foreground(theme.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)) + "\n")
+			b.WriteString(theme.GetSelectedStyle().Width(barWidth).Background(theme.CurrentTheme.Highlight).Foreground(theme.CurrentTheme.Background).Render(fmt.Sprintf(" ❯ %s  %s", icon, name)))
+			b.WriteByte('\n')
 		} else {
 			s := theme.GetBaseStyle()
 			if f.Name == "[ SELECT THIS FOLDER ]" { s = s.Foreground(theme.CurrentTheme.Highlight).Bold(true) }
 			b.WriteString(fmt.Sprintf("   %s  %s\n", icon, s.Render(name)))
 		}
 	}
-	for i := 0; i < (10 - (end - start)); i++ { b.WriteString("\n") }
+	for i := 0; i < (10 - (end - start)); i++ { b.WriteByte('\n') }
 	fLeft := theme.GetDimStyle().Render(fmt.Sprintf(" %d items match", len(m.Modal.FileList)))
 	fRight := theme.GetDimStyle().Render("↑/↓ Nav • ↵ Open • Esc Back ")
 	space := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 4
-	b.WriteString("\n" + fLeft + strings.Repeat(" ", space) + fRight)
+	b.WriteString(fmt.Sprintf("\n%s%s%s", fLeft, strings.Repeat(" ", space), fRight))
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
-func renderCustomModal(m AppModel, w, h int) string {
+func renderCustomModal(m AppModel, w, _ int) string {
 	title := theme.GetTitleStyle().
 		Background(theme.CurrentTheme.Highlight).
 		Foreground(theme.CurrentTheme.Background).
@@ -86,7 +89,8 @@ func renderCustomModal(m AppModel, w, h int) string {
 	innerW := w - 6
 	// 1. Output Panel
 	outputTitle := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render("🖥️  OUTPUT")
-	b.WriteString(outputTitle + "\n")
+	b.WriteString(outputTitle)
+	b.WriteByte('\n')
 	
 	m.Modal.CustomViewport.Width = innerW
 	m.Modal.CustomViewport.Height = 11
@@ -103,7 +107,8 @@ func renderCustomModal(m AppModel, w, h int) string {
 		Height(11).
 		Padding(0, 1).
 		Render(outputContent)
-	b.WriteString(outputBox + "\n")
+	b.WriteString(outputBox)
+	b.WriteByte('\n')
 
 	// 2. Input Panel
 	inputLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
@@ -113,7 +118,8 @@ func renderCustomModal(m AppModel, w, h int) string {
 	
 	inputLine := lipgloss.JoinHorizontal(lipgloss.Left, inputLabel, " ", inputField)
 	inputBox := lipgloss.NewStyle().Background(lipgloss.Color("#1a1a2e")).Width(innerW).Padding(0, 1).Render(inputLine)
-	b.WriteString(inputBox + "\n\n")
+	b.WriteString(inputBox)
+	b.WriteString("\n\n")
 
 	
 	// 3. Footer
@@ -132,7 +138,7 @@ func renderCustomModal(m AppModel, w, h int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, "", lipgloss.NewStyle().Padding(0, 2).Render(b.String()))
 }
 
-func renderHelpModal(m AppModel, w int) string {
+func renderHelpModal(_ AppModel, w int) string {
 	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("SYSTEM DOCUMENTATION")
 	hl := theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Width(w - 8).Align(lipgloss.Center)
 	row := func(k, v string) string {
@@ -140,38 +146,39 @@ func renderHelpModal(m AppModel, w int) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(hl.Render("🎮 NAVIGATION & CONTROLS") + "\n")
+	b.WriteString(hl.Render("🎮 NAVIGATION & CONTROLS"))
+	b.WriteByte('\n')
 	b.WriteString(row("[↑/↓] / [K/J]", "Move Selection"))
 	b.WriteString(row("[ENTER]", "Execute Action"))
 	b.WriteString(row("[ESC/BACK]", "Close Window"))
 	
-	b.WriteString("\n" + hl.Render("📱 DEVICE MODES GUIDE") + "\n")
+	b.WriteString(fmt.Sprintf("\n%s\n", hl.Render("📱 DEVICE MODES GUIDE")))
 	b.WriteString(" • FASTBOOT : Phone is in Bootloader mode (flashing images)\n")
 	b.WriteString(" • SIDELOAD : Recovery mode -> Apply update from ADB\n")
 	b.WriteString(" • UNAUTH   : Check phone screen for USB debug prompt\n")
 
-	b.WriteString("\n" + hl.Render("🛡️ FLASHING SAFETY TIPS") + "\n")
+	b.WriteString(fmt.Sprintf("\n%s\n", hl.Render("🛡️ FLASHING SAFETY TIPS")))
 	b.WriteString(" • Use original USB 2.0 cables whenever possible\n")
 	b.WriteString(" • Ensure battery is at least 30% before flashing\n")
 	b.WriteString(" • A/B SLOTS: Tool targets the active slot automatically\n")
 
-	b.WriteString("\n" + hl.Render("⌨️ CUSTOM COMMANDS") + "\n")
+	b.WriteString(fmt.Sprintf("\n%s\n", hl.Render("⌨️ CUSTOM COMMANDS")))
 	b.WriteString(" Runs directly in your flashtool directory. Use it for manual\n")
 	b.WriteString(" adb shell commands or custom fastboot flags.\n")
 
-	b.WriteString("\n" + theme.GetDimStyle().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core"))
+	b.WriteString(fmt.Sprintf("\n%s", theme.GetDimStyle().Width(w - 8).Align(lipgloss.Center).Render("Build: stable-1.2.0 • Pro Flasher Core")))
 	
 	return lipgloss.JoinVertical(lipgloss.Center, title, "", lipgloss.NewStyle().Width(w - 4).Padding(0, 2).Render(b.String()))
 }
 
-func renderSettingsModal(m AppModel, w, h int) string {
+func renderSettingsModal(m AppModel, w, _ int) string {
 	title := theme.GetTitleStyle().Width(w - 4).Align(lipgloss.Center).Render("APPLICATION CONFIGURATION")
 	var b strings.Builder
 	innerW := w - 6
 
 	renderItem := func(index int, label, desc, pathVal string) {
-		b.WriteString(" " + theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Render(label) + "\n")
-		b.WriteString("  " + theme.GetDimStyle().Render(desc) + "\n")
+		b.WriteString(fmt.Sprintf(" %s\n", theme.GetTitleStyle().Foreground(theme.CurrentTheme.Highlight).Render(label)))
+		b.WriteString(fmt.Sprintf("  %s\n", theme.GetDimStyle().Render(desc)))
 		
 		pad := "  "
 		if m.Modal.SettingsCursor == index {
@@ -182,13 +189,13 @@ func renderSettingsModal(m AppModel, w, h int) string {
 		if val == "" { val = "(NOT SET)" }
 		
 		pathStr := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Foreground).Render(val)
-		b.WriteString(pad + pathStr + "\n\n")
+		b.WriteString(fmt.Sprintf("%s%s\n\n", pad, pathStr))
 	}
 
 	renderItem(0, "📂 Base ROM Directory", "The root folder where your custom ROMs and images are stored.", m.Config.BaseDir)
 	renderItem(1, "📱 Target Device Folder", "Default folder structure path for the current device.", m.Config.DevicePath)
 	
-	for i := 0; i < 1; i++ { b.WriteString("\n") }
+	for i := 0; i < 1; i++ { b.WriteByte('\n') }
 	
 	saveLabel := "  [ SAVE AND APPLY CONFIGURATION ]  "
 	saveStyle := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Dim)
@@ -196,7 +203,8 @@ func renderSettingsModal(m AppModel, w, h int) string {
 		saveStyle = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true)
 	}
 	saveBtn := lipgloss.NewStyle().Width(innerW).Align(lipgloss.Center).Render(saveStyle.Render(saveLabel))
-	b.WriteString(saveBtn + "\n\n")
+	b.WriteString(saveBtn)
+	b.WriteString("\n\n")
 
 	fLeft, fRight := theme.GetDimStyle().Render(" TAB Nav • ↵ SELECT "), theme.GetDimStyle().Render(" ESC CANCEL ")
 	spaceCount := w - lipgloss.Width(fLeft) - lipgloss.Width(fRight) - 8

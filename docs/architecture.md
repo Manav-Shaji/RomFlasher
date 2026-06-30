@@ -1,16 +1,12 @@
 # Architecture Guide
 
-VoidFlasher PRIME uses a layered architecture strictly isolating the User Interface from the Business Logic and external command executions.
+NexForge uses a layered architecture strictly isolating the User Interface from the Business Logic and external command executions.
 
 ## Package Layout
 - `cmd/flashtool`: The application entry point and dependency injector.
-- `internal/ui`: The Bubble Tea model handling the terminal rendering (Cyberpunk aesthetic).
-- `internal/flasher`: The orchestrator containing the **Safety Engine**, the **Flashing State Machine**, and the **Single Operation Lock**.
-- `internal/android`: Managed wrappers around ADB and Fastboot executions handling timeouts, retries, and disconnect recovery.
-- `internal/device`: Hardware metadata extraction (Codename, A/B Slots, Dynamic Partitions).
-- `internal/updater`: GitHub API poller comparing semantic versions.
-- `internal/logger`: Structured, persistent JSON logger for comprehensive Audit Logs.
-- `internal/version`: Build-time metadata tracker.
+- `internal/config`: Application settings, dynamic path generation, and JSON configuration persistence.
+- `internal/core`: The business logic layer. Contains the `Engine` for executing and managing subprocesses (ADB/Fastboot) with context timeouts, log piping, and strict cancellation policies. Also handles device state polling and safety validation.
+- `internal/tui`: The Bubble Tea framework rendering the Cyberpunk terminal interface. Sub-packages include layout logic, handlers, and the cohesive `theme` package for cohesive styling.
 
 ## Concurrency & Safety
-Concurrency is heavily restricted to prevent device corruption. The `flasher` package utilizes a global `sync.Mutex` ensuring only one command pipeline is actively transmitting to the device. Any concurrent dispatch is immediately rejected with a controlled error.
+Concurrency is heavily restricted to prevent device corruption. The `core.Engine` encapsulates a dedicated `sync.Mutex` alongside the cancellation context (`activeCmdCancel`). This ensures that only one flash/ADB operation is actively executing and transmitting logs to the UI at any given time. Any user attempt to initiate concurrent dispatch is structurally prevented or cleanly rejected.

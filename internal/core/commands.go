@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,30 +19,33 @@ type LogMsg string
 type ProgressMsg float64
 type TaskCompleteMsg struct{ Err error }
 
-var LogChan = make(chan string, 200)
-
-var (
+type Engine struct {
+	LogChan         chan string
 	cmdMu           sync.Mutex
 	activeCmdCancel context.CancelFunc
-)
+}
 
-func CancelActiveCommand() {
-	cmdMu.Lock()
-	defer cmdMu.Unlock()
-	if activeCmdCancel != nil {
-		activeCmdCancel()
+func NewEngine() *Engine {
+	return &Engine{
+		LogChan: make(chan string, 200),
 	}
 }
 
-func WaitForLogs(ch chan string) tea.Cmd {
-	return func() tea.Msg { return LogMsg(<-ch) }
+func (e *Engine) CancelActiveCommand() {
+	e.cmdMu.Lock()
+	defer e.cmdMu.Unlock()
+	if e.activeCmdCancel != nil {
+		e.activeCmdCancel()
+	}
 }
 
-func RunFlashCommand(name string, args ...string) tea.Cmd {
+func (e *Engine) WaitForLogs() tea.Cmd {
+	return func() tea.Msg { return LogMsg(<-e.LogChan) }
+}
+
+func (e *Engine) RunFlashCommand(name string, args ...string) tea.Cmd {
 	return func() tea.Msg {
-		// 1. Dependency Check (Check PATH then local folder for portability)
 		if _, err := exec.LookPath(name); err != nil {
-			// Check if binary exists in current directory
 			localPath := "./" + name
 			checkPath := localPath
 			if runtime.GOOS == "windows" {
@@ -51,19 +53,15 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 			}
 			if _, err := os.Stat(checkPath); err != nil {
 				msg := fmt.Sprintf("CRITICAL ERROR: %s not found in PATH or local folder", name)
-				LogChan <- msg
-				return TaskCompleteMsg{Err: fmt.Errorf(msg)}
+				e.LogChan <- msg
+				return TaskCompleteMsg{Err: fmt.Errorf("%s", msg)}
 			}
-			// Use local path if found
 			name = checkPath
 		}
 
-		// Send initial log with the command being run (simulating CMD prompt)
 		pwd, _ := os.Getwd()
-		
 		displayCmd := name
 		displayArgs := args
-		// If running via cmd /c, show the actual command being passed
 		if name == "cmd" && len(args) >= 2 && args[0] == "/c" {
 			displayCmd = args[1]
 			displayArgs = args[2:]
@@ -71,20 +69,19 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 
 		cmdPrompt := fmt.Sprintf("%s>%s", pwd, displayCmd)
 		for _, a := range displayArgs { cmdPrompt += " " + a }
-		LogChan <- cmdPrompt
-		LogChan <- "STARTING COMMAND EXECUTION..."
+		e.LogChan <- cmdPrompt
+		e.LogChan <- "STARTING COMMAND EXECUTION..."
 
-		// 2. Context with Timeout (10 minutes for long flashes)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		
-		cmdMu.Lock()
-		activeCmdCancel = cancel
-		cmdMu.Unlock()
+		e.cmdMu.Lock()
+		e.activeCmdCancel = cancel
+		e.cmdMu.Unlock()
 
 		defer func() {
-			cmdMu.Lock()
-			activeCmdCancel = nil
-			cmdMu.Unlock()
+			e.cmdMu.Lock()
+			e.activeCmdCancel = nil
+			e.cmdMu.Unlock()
 			cancel()
 		}()
 
@@ -103,11 +100,11 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 		stderr, _ := cmd.StderrPipe()
 
 		if err := cmd.Start(); err != nil {
-			LogChan <- fmt.Sprintf("FAILED START: %v", err)
+			e.LogChan <- fmt.Sprintf("FAILED START: %v", err)
 			return TaskCompleteMsg{Err: err}
 		}
 
-		LogChan <- "STREAMERS ATTACHED. WAITING FOR OUTPUT..."
+		e.LogChan <- "STREAMERS ATTACHED. WAITING FOR OUTPUT..."
 
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -115,8 +112,6 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 		stream := func(r io.ReadCloser) {
 			defer wg.Done()
 			sc := bufio.NewScanner(r)
-			
-			// Custom split function to handle both \n and \r
 			sc.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 				if atEOF && len(data) == 0 { return 0, nil, nil }
 				for i := 0; i < len(data); i++ {
@@ -124,8 +119,6 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 						return i + 1, data[0:i], nil
 					}
 					if data[i] == '\r' {
-						// Mark this token as "terminated by \r" by adding a special character
-						// We'll use a hidden prefix in the actual channel
 						return i + 1, append([]byte("\r"), data[0:i]...), nil
 					}
 				}
@@ -137,9 +130,9 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 				token := sc.Bytes()
 				if len(token) == 0 { continue }
 				line := string(token)
-				LogChan <- line
+				e.LogChan <- line
 			}
-
+			if err := sc.Err(); err != nil { e.LogChan <- fmt.Sprintf("scanner error: %v", err) }
 		}
 
 		go stream(stdout)
@@ -149,18 +142,18 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 		wg.Wait()
 
 		if err != nil {
-			LogChan <- fmt.Sprintf("EXECUTION ERROR: %v", err)
+			e.LogChan <- fmt.Sprintf("EXECUTION ERROR: %v", err)
 		} else {
-			LogChan <- "SUCCESS: Task finished successfully."
+			e.LogChan <- "SUCCESS: Task finished successfully."
 		}
 
 		if ctx.Err() == context.Canceled {
-			LogChan <- "ABORTED: Task was canceled by user."
+			e.LogChan <- "ABORTED: Task was canceled by user."
 			return TaskCompleteMsg{Err: fmt.Errorf("task canceled")}
 		}
 
 		if ctx.Err() == context.DeadlineExceeded {
-			LogChan <- "TIMEOUT: Task exceeded the 10-minute limit."
+			e.LogChan <- "TIMEOUT: Task exceeded the 10-minute limit."
 			return TaskCompleteMsg{Err: fmt.Errorf("task timed out after 10m")}
 		}
 
@@ -168,32 +161,32 @@ func RunFlashCommand(name string, args ...string) tea.Cmd {
 	}
 }
 
-func RebootSystem(mode DeviceMode) tea.Cmd {
+func (e *Engine) RebootSystem(mode DeviceMode) tea.Cmd {
 	if mode == ModeFastboot {
-		return RunFlashCommand("fastboot", "reboot")
+		return e.RunFlashCommand("fastboot", "reboot")
 	}
-	return RunFlashCommand("adb", "reboot")
+	return e.RunFlashCommand("adb", "reboot")
 }
 
-func RebootRecovery(mode DeviceMode) tea.Cmd {
+func (e *Engine) RebootRecovery(mode DeviceMode) tea.Cmd {
 	if mode == ModeFastboot {
-		return RunFlashCommand("fastboot", "reboot", "recovery")
+		return e.RunFlashCommand("fastboot", "reboot", "recovery")
 	}
-	return RunFlashCommand("adb", "reboot", "recovery")
+	return e.RunFlashCommand("adb", "reboot", "recovery")
 }
 
-func FlashImage(part, path string) tea.Cmd {
-	return RunFlashCommand("fastboot", "flash", part, path)
+func (e *Engine) FlashImage(part, path string) tea.Cmd {
+	return e.RunFlashCommand("fastboot", "flash", part, path)
 }
 
-func WipeSuper(path string) tea.Cmd {
-	return RunFlashCommand("fastboot", "wipe-super", path)
+func (e *Engine) WipeSuper(path string) tea.Cmd {
+	return e.RunFlashCommand("fastboot", "wipe-super", path)
 }
 
-func Sideload(path string) tea.Cmd {
-	return RunFlashCommand("adb", "sideload", path)
+func (e *Engine) Sideload(path string) tea.Cmd {
+	return e.RunFlashCommand("adb", "sideload", path)
 }
 
-func RunCustomCommand(cmdStr string) tea.Cmd {
-	return RunFlashCommand("cmd", "/c", cmdStr)
+func (e *Engine) RunCustomCommand(cmdStr string) tea.Cmd {
+	return e.RunFlashCommand("cmd", "/c", cmdStr)
 }
