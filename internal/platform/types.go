@@ -1,6 +1,4 @@
-package domain
-
-import "time"
+package platform
 
 type DeviceMode string
 
@@ -13,20 +11,6 @@ const (
 	ModeUnauthorized DeviceMode = "UNAUTHORIZED"
 	ModeOffline      DeviceMode = "OFFLINE"
 )
-
-type LogLevel string
-
-const (
-	LogInfo    LogLevel = "INFO"
-	LogError   LogLevel = "ERROR"
-	LogSuccess LogLevel = "SUCCESS"
-)
-
-type LogEntry struct {
-	Level     LogLevel
-	Text      string
-	Timestamp time.Time
-}
 
 type DeviceState struct {
 	Mode    DeviceMode

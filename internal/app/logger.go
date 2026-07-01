@@ -1,4 +1,4 @@
-package logger
+package app
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 	"flashtool/internal/config"
 )
 
-// Initialize creates a new Zap logger based on the provided configuration.
-func Initialize(cfg *config.AppConfig) (*zap.Logger, error) {
+// InitLogger creates a new Zap logger based on the provided configuration.
+func InitLogger(cfg *config.AppConfig) (*zap.Logger, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
@@ -53,8 +53,8 @@ func Initialize(cfg *config.AppConfig) (*zap.Logger, error) {
 	}
 
 	// 4. Setup Log Output (File)
-	// Note: In a CLI/TUI app, logging to stdout directly will corrupt the UI. 
-	// Therefore, we strictly log to the file. 
+	// Note: In a CLI/TUI app, logging to stdout directly will corrupt the UI.
+	// Therefore, we strictly log to the file.
 	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file %s: %w", logPath, err)

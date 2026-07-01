@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 
 	"flashtool/internal/app"
 	"flashtool/internal/tui"
@@ -39,7 +39,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	cobra.MousetrapHelpText = ""
-	
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

@@ -17,7 +17,7 @@ var flashCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		partition := args[0]
 		path := args[1]
-		
+
 		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return err

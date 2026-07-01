@@ -1,7 +1,6 @@
 package tui
 
 import (
-
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
 )
@@ -29,4 +28,3 @@ func (m *AppModel) SetupUI() {
 	m.UI.TextInput.CharLimit = 128
 	m.UI.TextInput.Width = 40
 }
-

@@ -62,7 +62,7 @@ func Load() (*AppConfig, error) {
 	v.SetConfigName("config")
 	v.AddConfigPath(".")
 	v.AddConfigPath("./config")
-	
+
 	home, err := os.UserHomeDir()
 	if err == nil {
 		v.AddConfigPath(filepath.Join(home, ".nexforge"))

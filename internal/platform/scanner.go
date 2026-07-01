@@ -1,4 +1,4 @@
-package adb
+package platform
 
 import (
 	"context"
@@ -6,13 +6,11 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	"time"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"flashtool/internal/domain"
-	"flashtool/internal/platform/sysutil"
 )
 
 var (
@@ -23,11 +21,11 @@ var (
 	reAdbBatt = regexp.MustCompile(`level:\s*(\d+)`)
 
 	isScanning  atomic.Bool
-	deviceCache = make(map[string]domain.DeviceState)
+	deviceCache = make(map[string]DeviceState)
 	cacheMu     sync.RWMutex
 )
 
-type DeviceUpdateMsg domain.DeviceState
+type DeviceUpdateMsg DeviceState
 type PollMsg time.Time
 type HeartbeatMsg time.Time
 type SkipUpdateMsg struct{}
@@ -48,7 +46,7 @@ func PollDeviceCmd() tea.Cmd {
 }
 
 func runFastbootCmd(args ...string) ([]byte, error) {
-	cmdPath, err := sysutil.ResolveCommandPath("fastboot")
+	cmdPath, err := ResolveCommandPath("fastboot")
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +56,7 @@ func runFastbootCmd(args ...string) ([]byte, error) {
 }
 
 func runAdbCmd(args ...string) ([]byte, error) {
-	cmdPath, err := sysutil.ResolveCommandPath("adb")
+	cmdPath, err := ResolveCommandPath("adb")
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +71,12 @@ func CheckDeviceState() tea.Msg {
 	}
 	defer isScanning.Store(false)
 
-	state := domain.DeviceState{Mode: domain.ModeDisconnected, Serial: "-", Model: "-", Battery: "-", Slot: "-", Secure: "-"}
+	state := DeviceState{Mode: ModeDisconnected, Serial: "-", Model: "-", Battery: "-", Slot: "-", Secure: "-"}
 
 	if out, err := runFastbootCmd("devices"); err == nil && len(out) > 0 {
 		parts := strings.Fields(string(out))
 		if len(parts) >= 2 {
-			state.Mode, state.Serial = domain.ModeFastboot, parts[0]
+			state.Mode, state.Serial = ModeFastboot, parts[0]
 			state = fetchFastbootDetails(state)
 			return DeviceUpdateMsg(state)
 		}
@@ -92,23 +90,23 @@ func CheckDeviceState() tea.Msg {
 				serial, status := p[0], p[1]
 				switch status {
 				case "device":
-					state.Mode, state.Serial = domain.ModeDevice, serial
+					state.Mode, state.Serial = ModeDevice, serial
 					state = fetchAdbDetails(state)
 					return DeviceUpdateMsg(state)
 				case "sideload":
-					state.Mode, state.Serial = domain.ModeSideload, serial
+					state.Mode, state.Serial = ModeSideload, serial
 					state.Model = "SIDELOAD DEVICE"
 					return DeviceUpdateMsg(state)
 				case "recovery":
-					state.Mode, state.Serial = domain.ModeRecovery, serial
+					state.Mode, state.Serial = ModeRecovery, serial
 					state = fetchAdbDetails(state)
 					return DeviceUpdateMsg(state)
 				case "unauthorized":
-					state.Mode, state.Serial = domain.ModeUnauthorized, serial
+					state.Mode, state.Serial = ModeUnauthorized, serial
 					state.Model = "ACTION REQUIRED"
 					return DeviceUpdateMsg(state)
 				case "offline":
-					state.Mode, state.Serial = domain.ModeOffline, serial
+					state.Mode, state.Serial = ModeOffline, serial
 					state.Model = "OFFLINE"
 					return DeviceUpdateMsg(state)
 				}
@@ -119,14 +117,14 @@ func CheckDeviceState() tea.Msg {
 	return DeviceUpdateMsg(state)
 }
 
-func fetchFastbootDetails(s domain.DeviceState) domain.DeviceState {
+func fetchFastbootDetails(s DeviceState) DeviceState {
 	out, err := runFastbootCmd("-s", s.Serial, "getvar", "all")
 	if err != nil {
 		return s
 	}
-	
+
 	outputStr := string(out)
-	
+
 	cacheMu.RLock()
 	cached, ok := deviceCache[s.Serial]
 	cacheMu.RUnlock()
@@ -165,7 +163,7 @@ func fetchFastbootDetails(s domain.DeviceState) domain.DeviceState {
 		}
 
 		cacheMu.Lock()
-		deviceCache[s.Serial] = domain.DeviceState{Model: s.Model, Secure: s.Secure}
+		deviceCache[s.Serial] = DeviceState{Model: s.Model, Secure: s.Secure}
 		cacheMu.Unlock()
 	}
 
@@ -181,7 +179,7 @@ func fetchFastbootDetails(s domain.DeviceState) domain.DeviceState {
 	return s
 }
 
-func fetchAdbDetails(s domain.DeviceState) domain.DeviceState {
+func fetchAdbDetails(s DeviceState) DeviceState {
 	cacheMu.RLock()
 	cached, ok := deviceCache[s.Serial]
 	cacheMu.RUnlock()
@@ -192,8 +190,12 @@ func fetchAdbDetails(s domain.DeviceState) domain.DeviceState {
 	} else {
 		out, _ := runAdbCmd("-s", s.Serial, "shell", "getprop ro.product.marketname; getprop ro.product.model; getprop ro.product.brand; getprop ro.product.device")
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		for i := range lines { lines[i] = strings.TrimSpace(lines[i]) }
-		for len(lines) < 4 { lines = append(lines, "") }
+		for i := range lines {
+			lines[i] = strings.TrimSpace(lines[i])
+		}
+		for len(lines) < 4 {
+			lines = append(lines, "")
+		}
 		marketProp, modelProp, brandProp, codenameProp := lines[0], lines[1], lines[2], strings.ToUpper(lines[3])
 
 		marketingLabel := ""
@@ -217,7 +219,9 @@ func fetchAdbDetails(s domain.DeviceState) domain.DeviceState {
 		name := ""
 		candidates := []string{marketProp, modelProp, marketingLabel, codenameProp}
 		for _, c := range candidates {
-			if c == "" { continue }
+			if c == "" {
+				continue
+			}
 			pretty := prettyDeviceName(c)
 			if pretty != strings.ToUpper(c) {
 				name = pretty
@@ -241,7 +245,7 @@ func fetchAdbDetails(s domain.DeviceState) domain.DeviceState {
 		s.Secure = "YES"
 
 		cacheMu.Lock()
-		deviceCache[s.Serial] = domain.DeviceState{Model: s.Model, Secure: s.Secure}
+		deviceCache[s.Serial] = DeviceState{Model: s.Model, Secure: s.Secure}
 		cacheMu.Unlock()
 	}
 

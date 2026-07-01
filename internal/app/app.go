@@ -4,9 +4,26 @@ import (
 	"fmt"
 
 	"flashtool/internal/config"
-	"flashtool/internal/engine"
-	"flashtool/internal/logger"
+	"flashtool/internal/core"
+	"go.uber.org/zap"
 )
+
+// App is the central dependency injection container for the CLI and TUI.
+// It holds all active, initialized infrastructure required for the program to execute.
+type App struct {
+	Config *config.AppConfig
+	Logger *zap.Logger
+	Engine *core.Engine
+}
+
+// New creates a new Application container.
+func New(cfg *config.AppConfig, logger *zap.Logger, engineInstance *core.Engine) *App {
+	return &App{
+		Config: cfg,
+		Logger: logger,
+		Engine: engineInstance,
+	}
+}
 
 // Initialize executes the core startup sequence of the application.
 // It loads configuration, initializes the logger, sets up the engine,
@@ -19,7 +36,7 @@ func Initialize() (*App, error) {
 	}
 
 	// Initialize Logger (Zap)
-	log, err := logger.Initialize(cfg)
+	log, err := InitLogger(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap logger failed: %w", err)
 	}
@@ -27,8 +44,8 @@ func Initialize() (*App, error) {
 	log.Info("Starting NexForge initialization sequence")
 
 	// Initialize Core Engine
-	engineInstance := engine.NewEngine(cfg, log.Named("engine"))
-	
+	engineInstance := core.NewEngine(cfg, log.Named("engine"))
+
 	// Create Application Container
 	applicationContainer := New(cfg, log, engineInstance)
 

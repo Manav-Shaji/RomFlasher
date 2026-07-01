@@ -1,10 +1,9 @@
 package tui
 
 import (
-	"flashtool/internal/domain"
-	"flashtool/internal/platform/adb"
-	"flashtool/internal/engine"
 	"flashtool/internal/config"
+	"flashtool/internal/core"
+	"flashtool/internal/platform"
 
 	"context"
 	"fmt"
@@ -22,8 +21,8 @@ import (
 func (m AppModel) startSetupFlow() (AppModel, tea.Cmd) {
 	m.ActiveModal = ModalFile
 	m.Modal.FileTitle = "SELECT MAIN CUSTOM ROMS DIR"
-	m.Modal.FileFilter = "" 
-	
+	m.Modal.FileFilter = ""
+
 	m.Modal.FileDir = m.App.Config.BaseDir
 	if _, err := os.Stat(m.Modal.FileDir); err != nil {
 		m.Modal.FileDir, _ = os.Getwd()
@@ -71,7 +70,9 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "enter":
 			m.ActiveModal, m.Busy = ModalNone, true
 			m.UI.TextInput.Blur()
-			if m.Modal.OnConfirm != nil { return m, m.Modal.OnConfirm() }
+			if m.Modal.OnConfirm != nil {
+				return m, m.Modal.OnConfirm()
+			}
 		case "n", "esc":
 			m.ActiveModal = ModalNone
 			m.UI.TextInput.Blur()
@@ -79,16 +80,26 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case ModalFile:
 		switch msg.String() {
-		case "up":   if m.Modal.FileCursor > 0 { m.Modal.FileCursor-- }
-		case "down": if m.Modal.FileCursor < len(m.Modal.FileList)-1 { m.Modal.FileCursor++ }
+		case "up":
+			if m.Modal.FileCursor > 0 {
+				m.Modal.FileCursor--
+			}
+		case "down":
+			if m.Modal.FileCursor < len(m.Modal.FileList)-1 {
+				m.Modal.FileCursor++
+			}
 		case "enter":
-			if len(m.Modal.FileList) == 0 { return m, cmd }
+			if len(m.Modal.FileList) == 0 {
+				return m, cmd
+			}
 			sel := m.Modal.FileList[m.Modal.FileCursor]
-			
+
 			if sel.Name == "[ SELECT THIS FOLDER ]" {
 				m.ActiveModal = ModalNone
 				m.UI.TextInput.Blur()
-				if m.Modal.OnFileSelect != nil { return m, m.Modal.OnFileSelect(m.Modal.FileDir) }
+				if m.Modal.OnFileSelect != nil {
+					return m, m.Modal.OnFileSelect(m.Modal.FileDir)
+				}
 				return m, nil
 			}
 
@@ -132,16 +143,22 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ModalSettings:
 		switch msg.String() {
 		case "up", "k", "shift+tab":
-			if m.Modal.SettingsCursor > 0 { m.Modal.SettingsCursor-- }
+			if m.Modal.SettingsCursor > 0 {
+				m.Modal.SettingsCursor--
+			}
 		case "down", "j", "tab":
-			if m.Modal.SettingsCursor < 2 { m.Modal.SettingsCursor++ }
+			if m.Modal.SettingsCursor < 2 {
+				m.Modal.SettingsCursor++
+			}
 		case "enter":
 			switch m.Modal.SettingsCursor {
 			case 0:
 				m.ActiveModal = ModalFile
 				m.Modal.FileTitle = "SELECT BASE ROM DIRECTORY"
 				m.Modal.FileDir = m.App.Config.BaseDir
-				if _, err := os.Stat(m.Modal.FileDir); err != nil { m.Modal.FileDir, _ = os.Getwd() }
+				if _, err := os.Stat(m.Modal.FileDir); err != nil {
+					m.Modal.FileDir, _ = os.Getwd()
+				}
 				m.Modal.FullFileList = LoadFiles(m.Modal.FileDir, "")
 				m.Modal.FileList = m.Modal.FullFileList
 				m.Modal.FileCursor = 0
@@ -154,10 +171,14 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.ActiveModal = ModalFile
 				m.Modal.FileTitle = "SELECT DEVICE FOLDER"
 				m.Modal.FileDir = m.App.Config.DevicePath
-				if m.Modal.FileDir == "" { m.Modal.FileDir = m.App.Config.BaseDir }
+				if m.Modal.FileDir == "" {
+					m.Modal.FileDir = m.App.Config.BaseDir
+				}
 				if _, err := os.Stat(m.Modal.FileDir); err != nil {
 					m.Modal.FileDir = m.App.Config.BaseDir
-					if _, err := os.Stat(m.Modal.FileDir); err != nil { m.Modal.FileDir, _ = os.Getwd() }
+					if _, err := os.Stat(m.Modal.FileDir); err != nil {
+						m.Modal.FileDir, _ = os.Getwd()
+					}
 				}
 				m.Modal.FullFileList = LoadFiles(m.Modal.FileDir, "")
 				m.Modal.FileList = m.Modal.FullFileList
@@ -171,14 +192,14 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				err := config.SaveConfig(m.App.Config)
 				m.BaseDir = m.App.Config.BaseDir
 				m.DevicePath = m.App.Config.DevicePath
-				
+
 				if err != nil {
-					m.ActiveToast = &Toast{Message: "Save Failed", Type: domain.LogError}
+					m.ActiveToast = &Toast{Message: "Save Failed", Type: core.LogError}
 				} else {
-					m.ActiveToast = &Toast{Message: "Settings Saved", Type: domain.LogSuccess}
+					m.ActiveToast = &Toast{Message: "Settings Saved", Type: core.LogSuccess}
 				}
 				m.ActiveModal = ModalNone
-				return m, toastTimeoutCmd(3*time.Second)
+				return m, toastTimeoutCmd(3 * time.Second)
 			}
 		}
 	}
@@ -198,9 +219,9 @@ func (m AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
-		if msg.String() == "ctrl+c" || msg.String() == "esc" { 
+		if msg.String() == "ctrl+c" || msg.String() == "esc" {
 			m.App.Engine.CancelActiveCommand()
-			return m, nil 
+			return m, nil
 		}
 		return m, nil
 	}
@@ -210,24 +231,29 @@ func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "up", "k":   m.Selection = (m.Selection - 1 + len(m.Menu)) % len(m.Menu)
-	case "down", "j": m.Selection = (m.Selection + 1) % len(m.Menu)
-	case "enter":     return handleMenuSelect(m)
-	case "q", "ctrl+c": return m, tea.Quit
-	case "h", "?":    m.ActiveModal = ModalHelp
+	case "up", "k":
+		m.Selection = (m.Selection - 1 + len(m.Menu)) % len(m.Menu)
+	case "down", "j":
+		m.Selection = (m.Selection + 1) % len(m.Menu)
+	case "enter":
+		return handleMenuSelect(m)
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "h", "?":
+		m.ActiveModal = ModalHelp
 	}
 	return m, nil
 }
 
-func (m AppModel) handlePollMsg(_ adb.PollMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handlePollMsg(_ platform.PollMsg) (tea.Model, tea.Cmd) {
 	if m.Busy {
-		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return adb.PollMsg(t) })
+		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return platform.PollMsg(t) })
 	}
-	return m, tea.Batch(func() tea.Msg { return adb.CheckDeviceState() }, adb.PollDeviceCmd())
+	return m, tea.Batch(func() tea.Msg { return platform.CheckDeviceState() }, platform.PollDeviceCmd())
 }
 
-func (m AppModel) handleDeviceUpdate(msg adb.DeviceUpdateMsg) (tea.Model, tea.Cmd) {
-	newDevice := domain.DeviceState(msg)
+func (m AppModel) handleDeviceUpdate(msg platform.DeviceUpdateMsg) (tea.Model, tea.Cmd) {
+	newDevice := platform.DeviceState(msg)
 	newMode := newDevice.Mode
 	var cmds []tea.Cmd
 
@@ -235,32 +261,33 @@ func (m AppModel) handleDeviceUpdate(msg adb.DeviceUpdateMsg) (tea.Model, tea.Cm
 		m.IsRefreshing = false
 		displayMode := formatDeviceMode(newMode)
 
-		if newMode == domain.ModeDisconnected {
-			m.ActiveToast = &Toast{Message: "Scan Finished: NO DEVICE", Type: domain.LogInfo}
+		if newMode == platform.ModeDisconnected {
+			m.ActiveToast = &Toast{Message: "Scan Finished: NO DEVICE", Type: core.LogInfo}
 		} else {
-			m.ActiveToast = &Toast{Message: fmt.Sprintf("Scan Complete: %s", displayMode), Type: domain.LogSuccess}
+			m.ActiveToast = &Toast{Message: fmt.Sprintf("Scan Complete: %s", displayMode), Type: core.LogSuccess}
 		}
 		cmds = append(cmds, toastTimeoutCmd(3*time.Second))
 	} else if m.Device.Mode != newMode {
-		m.ActiveToast = &Toast{Message: fmt.Sprintf("Mode: %s", newMode), Type: domain.LogInfo}
+		m.ActiveToast = &Toast{Message: fmt.Sprintf("Mode: %s", newMode), Type: core.LogInfo}
 		cmds = append(cmds, toastTimeoutCmd(3*time.Second))
 	}
 	m.Device = newDevice
 	return m, tea.Batch(cmds...)
 }
 
-func (m AppModel) handleLogMsg(msg engine.LogMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handleLogMsg(msg core.LogMsg) (tea.Model, tea.Cmd) {
 	line := string(msg)
-
 
 	// Process Standard Logs
 	isOverwrite := strings.HasPrefix(line, "\r")
 
 	cleanLine := strings.TrimPrefix(line, "\r")
-	if cleanLine == "" { return m, m.App.Engine.WaitForLogs() }
+	if cleanLine == "" {
+		return m, m.App.Engine.WaitForLogs()
+	}
 
 	level := parseLogLevel(cleanLine)
-	entry := domain.LogEntry{Level: level, Text: cleanLine, Timestamp: time.Now()}
+	entry := core.LogEntry{Level: level, Text: cleanLine, Timestamp: time.Now()}
 
 	if m.ActiveModal == ModalCustom {
 		m.syncCustomLogs(entry, isOverwrite)
@@ -271,26 +298,26 @@ func (m AppModel) handleLogMsg(msg engine.LogMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(m.App.Engine.WaitForLogs())
 }
 
-func (m AppModel) handleTaskComplete(msg engine.TaskCompleteMsg) (tea.Model, tea.Cmd) {
+func (m AppModel) handleTaskComplete(msg core.TaskCompleteMsg) (tea.Model, tea.Cmd) {
 	m.Busy = false
 	status := "[ DONE ]"
 	if msg.Err != nil {
-		m.ActiveToast = &Toast{Message: "Failed", Type: domain.LogError}
+		m.ActiveToast = &Toast{Message: "Failed", Type: core.LogError}
 		status = fmt.Sprintf("[ FAILED: %v ]", msg.Err)
 	} else {
-		m.ActiveToast = &Toast{Message: "Success", Type: domain.LogSuccess}
+		m.ActiveToast = &Toast{Message: "Success", Type: core.LogSuccess}
 	}
 
-	entry := domain.LogEntry{Text: status, Level: domain.LogInfo, Timestamp: time.Now()}
-	
+	entry := core.LogEntry{Text: status, Level: core.LogInfo, Timestamp: time.Now()}
+
 	if m.ActiveModal == ModalCustom {
 		m.Modal.CustomLogs.Add(entry)
 	} else {
 		m.Logs.Add(entry)
 	}
 	m.LogsDirty = true
-	
-	return m, toastTimeoutCmd(3*time.Second)
+
+	return m, toastTimeoutCmd(3 * time.Second)
 }
 
 func (m AppModel) handleSetupMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -336,31 +363,37 @@ func (m AppModel) handleSetupMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 /* HELPERS */
 
-func formatDeviceMode(m domain.DeviceMode) string {
+func formatDeviceMode(m platform.DeviceMode) string {
 	switch m {
-	case domain.ModeDevice:       return "ADB DEVICE"
-	case domain.ModeSideload:     return "ADB SIDELOAD"
-	case domain.ModeRecovery:     return "RECOVERY"
-	case domain.ModeFastboot:     return "FASTBOOT"
-	case domain.ModeDisconnected: return "NOT FOUND"
-	default:               return string(m)
+	case platform.ModeDevice:
+		return "ADB DEVICE"
+	case platform.ModeSideload:
+		return "ADB SIDELOAD"
+	case platform.ModeRecovery:
+		return "RECOVERY"
+	case platform.ModeFastboot:
+		return "FASTBOOT"
+	case platform.ModeDisconnected:
+		return "NOT FOUND"
+	default:
+		return string(m)
 	}
 }
 
-func parseLogLevel(line string) domain.LogLevel {
+func parseLogLevel(line string) core.LogLevel {
 	line = strings.ToUpper(line)
-	if strings.HasPrefix(line, "ERR:") || strings.HasPrefix(line, "ERROR:") || 
-	   strings.Contains(line, "FAILED") || strings.Contains(line, "CRITICAL") { 
-		return domain.LogError 
+	if strings.HasPrefix(line, "ERR:") || strings.HasPrefix(line, "ERROR:") ||
+		strings.Contains(line, "FAILED") || strings.Contains(line, "CRITICAL") {
+		return core.LogError
 	}
-	if strings.HasPrefix(line, "OK") || strings.Contains(line, "SUCCESS") || 
-	   strings.HasPrefix(line, "FINISHED") {
-		return domain.LogSuccess 
+	if strings.HasPrefix(line, "OK") || strings.Contains(line, "SUCCESS") ||
+		strings.HasPrefix(line, "FINISHED") {
+		return core.LogSuccess
 	}
-	return domain.LogInfo
+	return core.LogInfo
 }
 
-func (m *AppModel) syncCustomLogs(entry domain.LogEntry, overwrite bool) {
+func (m *AppModel) syncCustomLogs(entry core.LogEntry, overwrite bool) {
 	if overwrite && m.Modal.CustomLogs.Len() > 0 {
 		m.Modal.CustomLogs.ReplaceLast(entry)
 	} else {
@@ -369,7 +402,7 @@ func (m *AppModel) syncCustomLogs(entry domain.LogEntry, overwrite bool) {
 	m.LogsDirty = true
 }
 
-func (m *AppModel) syncMainLogs(entry domain.LogEntry, overwrite bool) {
+func (m *AppModel) syncMainLogs(entry core.LogEntry, overwrite bool) {
 	if overwrite && m.Logs.Len() > 0 {
 		last, _ := m.Logs.Last()
 		if !strings.Contains(last.Text, ">") && !strings.Contains(strings.ToUpper(last.Text), "EXECUTION") {
@@ -384,16 +417,16 @@ func (m *AppModel) syncMainLogs(entry domain.LogEntry, overwrite bool) {
 }
 
 func (m AppModel) canFlash(isSideload bool) (bool, string) {
-	if m.Device.Mode == domain.ModeDisconnected || m.Device.Mode == domain.ModeOffline {
+	if m.Device.Mode == platform.ModeDisconnected || m.Device.Mode == platform.ModeOffline {
 		return false, "Device is disconnected or offline."
 	}
 
 	if isSideload {
-		if m.Device.Mode != domain.ModeRecovery && m.Device.Mode != domain.ModeDevice && m.Device.Mode != domain.ModeSideload {
+		if m.Device.Mode != platform.ModeRecovery && m.Device.Mode != platform.ModeDevice && m.Device.Mode != platform.ModeSideload {
 			return false, "Device must be in Recovery or Sideload mode."
 		}
 	} else {
-		if m.Device.Mode != domain.ModeFastboot {
+		if m.Device.Mode != platform.ModeFastboot {
 			return false, "Device must be in Fastboot mode."
 		}
 	}
@@ -419,18 +452,24 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 
 	var filter string
 	switch sel.Action {
-	case "flash_rec", "flash_boot", "wipe_super": filter = ".img"
-	case "sideload": filter = ".zip"
+	case "flash_rec", "flash_boot", "wipe_super":
+		filter = ".img"
+	case "sideload":
+		filter = ".zip"
 	}
 
 	if filter != "" {
 		m.ActiveModal = ModalFile
 		m.Modal.FileTitle = "SELECT " + strings.ToUpper(strings.Split(sel.Label, " ")[1]) + " FILE"
 		m.Modal.FileFilter = filter
-		
+
 		m.Modal.FileDir = m.DevicePath
-		if m.Modal.FileDir == "" { m.Modal.FileDir = m.BaseDir }
-		if m.Modal.FileDir == "" { m.Modal.FileDir, _ = os.Getwd() }
+		if m.Modal.FileDir == "" {
+			m.Modal.FileDir = m.BaseDir
+		}
+		if m.Modal.FileDir == "" {
+			m.Modal.FileDir, _ = os.Getwd()
+		}
 
 		if subDir, ok := m.App.Config.Folders[sel.Action]; ok && subDir != "" {
 			target := filepath.Join(m.Modal.FileDir, subDir)
@@ -442,12 +481,12 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		m.Modal.FullFileList = LoadFiles(m.Modal.FileDir, m.Modal.FileFilter)
 		m.Modal.FileList = m.Modal.FullFileList
 		m.Modal.FileCursor = 0
-		
+
 		switch sel.Action {
 		case "flash_rec":
 			if ok, msg := m.canFlash(false); !ok {
 				m.ActiveModal = ModalNone
-				m.ActiveToast = &Toast{Message: msg, Type: domain.LogError}
+				m.ActiveToast = &Toast{Message: msg, Type: core.LogError}
 				return m, toastTimeoutCmd(3 * time.Second)
 			}
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
@@ -464,7 +503,7 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		case "flash_boot":
 			if ok, msg := m.canFlash(false); !ok {
 				m.ActiveModal = ModalNone
-				m.ActiveToast = &Toast{Message: msg, Type: domain.LogError}
+				m.ActiveToast = &Toast{Message: msg, Type: core.LogError}
 				return m, toastTimeoutCmd(3 * time.Second)
 			}
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
@@ -481,7 +520,7 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		case "wipe_super":
 			if ok, msg := m.canFlash(false); !ok {
 				m.ActiveModal = ModalNone
-				m.ActiveToast = &Toast{Message: msg, Type: domain.LogError}
+				m.ActiveToast = &Toast{Message: msg, Type: core.LogError}
 				return m, toastTimeoutCmd(3 * time.Second)
 			}
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
@@ -498,7 +537,7 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		case "sideload":
 			if ok, msg := m.canFlash(true); !ok {
 				m.ActiveModal = ModalNone
-				m.ActiveToast = &Toast{Message: msg, Type: domain.LogError}
+				m.ActiveToast = &Toast{Message: msg, Type: core.LogError}
 				return m, toastTimeoutCmd(3 * time.Second)
 			}
 			m.Modal.OnFileSelect = func(p string) tea.Cmd {
@@ -535,10 +574,10 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 		}
 	case "refresh":
 		m.IsRefreshing = true
-		m.ActiveToast = &Toast{Message: "Scanning for devices...", Type: domain.LogInfo}
+		m.ActiveToast = &Toast{Message: "Scanning for devices...", Type: core.LogInfo}
 		return m, tea.Batch(
-			func() tea.Msg { return adb.CheckDeviceState() },
-			adb.PollDeviceCmd(),
+			func() tea.Msg { return platform.CheckDeviceState() },
+			platform.PollDeviceCmd(),
 			toastTimeoutCmd(2*time.Second),
 		)
 	case "help":

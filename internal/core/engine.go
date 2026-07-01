@@ -1,4 +1,4 @@
-package engine
+package core
 
 import (
 	"bufio"
@@ -11,12 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
 	tea "github.com/charmbracelet/bubbletea"
+	"go.uber.org/zap"
 
 	"flashtool/internal/config"
-	"flashtool/internal/engine/services"
-	"flashtool/internal/platform/sysutil"
+	"flashtool/internal/platform"
 )
 
 type LogMsg string
@@ -29,8 +28,8 @@ type Engine struct {
 	logger  *zap.Logger
 	cfg     *config.AppConfig
 
-	FlashService  services.FlashService
-	DeviceService services.DeviceService
+	FlashService  FlashService
+	DeviceService DeviceService
 
 	cmdMu           sync.Mutex
 	activeCmdCancel context.CancelFunc
@@ -38,17 +37,17 @@ type Engine struct {
 
 // NewEngine creates a new core Engine.
 func NewEngine(cfg *config.AppConfig, logger *zap.Logger) *Engine {
-	sysutil.ExtractEmbeddedBinaries()
-	
+	platform.ExtractEmbeddedBinaries()
+
 	e := &Engine{
 		LogChan: make(chan string, 200),
 		logger:  logger,
 		cfg:     cfg,
 	}
 
-	e.FlashService = services.NewFlashService(e)
-	e.DeviceService = services.NewDeviceService(e)
-	
+	e.FlashService = NewFlashService(e)
+	e.DeviceService = NewDeviceService(e)
+
 	return e
 }
 
@@ -87,7 +86,7 @@ func (e *Engine) ExecuteAsync(action func(context.Context) error) tea.Cmd {
 	}
 }
 
-// RunCommand implements services.Executor, running raw shell commands and piping output.
+// RunCommand implements Executor, running raw shell commands and piping output.
 func (e *Engine) RunCommand(ctx context.Context, name string, args ...string) error {
 	allowedCmds := map[string]bool{"adb": true, "fastboot": true, "cmd": true}
 	if !allowedCmds[name] {
@@ -97,7 +96,7 @@ func (e *Engine) RunCommand(ctx context.Context, name string, args ...string) er
 	}
 
 	e.logger.Debug("Resolving command path", zap.String("name", name))
-	resolvedPath, err := sysutil.ResolveCommandPath(name)
+	resolvedPath, err := platform.ResolveCommandPath(name)
 	if err != nil {
 		msg := fmt.Sprintf("CRITICAL ERROR: %s", err.Error())
 		e.LogChan <- msg
@@ -115,8 +114,10 @@ func (e *Engine) RunCommand(ctx context.Context, name string, args ...string) er
 	}
 
 	cmdPrompt := fmt.Sprintf("%s>%s", pwd, displayCmd)
-	for _, a := range displayArgs { cmdPrompt += " " + a }
-	
+	for _, a := range displayArgs {
+		cmdPrompt += " " + a
+	}
+
 	e.LogChan <- cmdPrompt
 	e.LogChan <- "STARTING COMMAND EXECUTION..."
 	e.logger.Info("Executing command", zap.String("command", cmdPrompt))
@@ -157,25 +158,37 @@ func (e *Engine) RunCommand(ctx context.Context, name string, args ...string) er
 		defer wg.Done()
 		sc := bufio.NewScanner(r)
 		sc.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-			if atEOF && len(data) == 0 { return 0, nil, nil }
-			for i := 0; i < len(data); i++ {
-				if data[i] == '\n' || data[i] == '\r' { return i + 1, data[0 : i+1], nil }
+			if atEOF && len(data) == 0 {
+				return 0, nil, nil
 			}
-			if atEOF { return len(data), append(data, '\n'), nil }
+			for i := 0; i < len(data); i++ {
+				if data[i] == '\n' || data[i] == '\r' {
+					return i + 1, data[0 : i+1], nil
+				}
+			}
+			if atEOF {
+				return len(data), append(data, '\n'), nil
+			}
 			return 0, nil, nil
 		})
 
 		for sc.Scan() {
 			token := sc.Bytes()
-			if len(token) == 0 { continue }
-			
+			if len(token) == 0 {
+				continue
+			}
+
 			isCR := token[len(token)-1] == '\r'
 			token = token[:len(token)-1]
-			if len(token) == 0 { continue }
-			
+			if len(token) == 0 {
+				continue
+			}
+
 			line := string(token)
-			if isCR { line = "\r" + line }
-			
+			if isCR {
+				line = "\r" + line
+			}
+
 			select {
 			case e.LogChan <- line:
 			case <-time.After(50 * time.Millisecond):

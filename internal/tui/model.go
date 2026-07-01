@@ -2,7 +2,8 @@ package tui
 
 import (
 	"flashtool/internal/app"
-	"flashtool/internal/domain"
+	"flashtool/internal/core"
+	"flashtool/internal/platform"
 
 	"time"
 
@@ -26,7 +27,7 @@ const (
 )
 
 type LogBuffer struct {
-	data  []domain.LogEntry
+	data  []core.LogEntry
 	size  int
 	head  int
 	count int
@@ -34,12 +35,12 @@ type LogBuffer struct {
 
 func NewLogBuffer(size int) *LogBuffer {
 	return &LogBuffer{
-		data: make([]domain.LogEntry, size),
+		data: make([]core.LogEntry, size),
 		size: size,
 	}
 }
 
-func (lb *LogBuffer) Add(entry domain.LogEntry) {
+func (lb *LogBuffer) Add(entry core.LogEntry) {
 	if lb.count < lb.size {
 		lb.data[lb.count] = entry
 		lb.count++
@@ -53,14 +54,14 @@ func (lb *LogBuffer) Len() int {
 	return lb.count
 }
 
-func (lb *LogBuffer) Iterate(fn func(domain.LogEntry)) {
+func (lb *LogBuffer) Iterate(fn func(core.LogEntry)) {
 	for i := 0; i < lb.count; i++ {
 		idx := (lb.head + i) % lb.size
 		fn(lb.data[idx])
 	}
 }
 
-func (lb *LogBuffer) ReplaceLast(entry domain.LogEntry) {
+func (lb *LogBuffer) ReplaceLast(entry core.LogEntry) {
 	if lb.count == 0 {
 		lb.Add(entry)
 		return
@@ -69,15 +70,13 @@ func (lb *LogBuffer) ReplaceLast(entry domain.LogEntry) {
 	lb.data[idx] = entry
 }
 
-func (lb *LogBuffer) Last() (domain.LogEntry, bool) {
+func (lb *LogBuffer) Last() (core.LogEntry, bool) {
 	if lb.count == 0 {
-		return domain.LogEntry{}, false
+		return core.LogEntry{}, false
 	}
 	idx := (lb.head + lb.count - 1) % lb.size
 	return lb.data[idx], true
 }
-
-
 
 /* DATA MODELS */
 
@@ -96,7 +95,7 @@ type FileItem struct {
 
 type Toast struct {
 	Message string
-	Type    domain.LogLevel
+	Type    core.LogLevel
 }
 
 /* APP MODEL */
@@ -110,10 +109,10 @@ type AppModel struct {
 	ActiveModal   ModalType
 	Tick          int // Pulsing animation tick
 
-	App           *app.App
+	App *app.App
 
 	// Device State
-	Device domain.DeviceState
+	Device platform.DeviceState
 
 	// UI Components
 	UI struct {
@@ -126,7 +125,7 @@ type AppModel struct {
 	Modal struct {
 		ConfirmMsg string
 		OnConfirm  func() tea.Cmd
-		
+
 		FileDir      string
 		FileList     []FileItem
 		FullFileList []FileItem
@@ -160,11 +159,11 @@ type AppModel struct {
 
 func NewModel(app *app.App) AppModel {
 	m := AppModel{
-		App: app,
-		BaseDir: app.Config.BaseDir,
+		App:        app,
+		BaseDir:    app.Config.BaseDir,
 		DevicePath: app.Config.DevicePath,
-		Device: domain.DeviceState{
-			Mode:    domain.ModeDisconnected,
+		Device: platform.DeviceState{
+			Mode:    platform.ModeDisconnected,
 			Serial:  "-",
 			Model:   "-",
 			Battery: "-",
@@ -173,9 +172,9 @@ func NewModel(app *app.App) AppModel {
 		},
 		Logs: NewLogBuffer(500),
 	}
-	m.Logs.Add(domain.LogEntry{Level: domain.LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()})
+	m.Logs.Add(core.LogEntry{Level: core.LogInfo, Text: "SYSTEM INITIALIZED. READY.", Timestamp: time.Now()})
 	m.Modal.CustomLogs = NewLogBuffer(500)
-	
+
 	m.Menu = GetDefaultMenu()
 	m.SetupUI()
 	m.UI.Viewport = viewport.New(0, 0)

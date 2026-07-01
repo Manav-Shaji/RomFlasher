@@ -1,9 +1,8 @@
 package tui
 
 import (
-	"flashtool/internal/domain"
-	"flashtool/internal/engine"
-	"flashtool/internal/platform/adb"
+	"flashtool/internal/core"
+	"flashtool/internal/platform"
 
 	"os"
 	"path/filepath"
@@ -12,9 +11,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-	"flashtool/internal/tui/theme"
+	"github.com/charmbracelet/lipgloss"
 )
 
 /* MESSAGES */
@@ -42,7 +40,7 @@ type SearchDebounceMsg struct {
 
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
-		adb.PollDeviceCmd(),
+		platform.PollDeviceCmd(),
 		m.App.Engine.WaitForLogs(),
 		LogTickCmd(),
 		textinput.Blink,
@@ -65,9 +63,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 
-	case adb.HeartbeatMsg:
+	case platform.HeartbeatMsg:
 		m.Tick++
-		return m, adb.HeartbeatCmd()
+		return m, platform.HeartbeatCmd()
 
 	case LogTickMsg:
 		if m.LogsDirty {
@@ -86,16 +84,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, LogTickCmd()
 
-	case adb.PollMsg:
+	case platform.PollMsg:
 		return m.handlePollMsg(msg)
 
-	case adb.DeviceUpdateMsg:
+	case platform.DeviceUpdateMsg:
 		return m.handleDeviceUpdate(msg)
 
-	case engine.LogMsg:
+	case core.LogMsg:
 		return m.handleLogMsg(msg)
 
-	case engine.TaskCompleteMsg:
+	case core.TaskCompleteMsg:
 		return m.handleTaskComplete(msg)
 
 	case ToastTimeoutMsg:
@@ -128,18 +126,26 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) GetLayoutDimensions() (menuW, detailW, mainH, bodyH, logH int) {
-	if m.Width == 0 || m.Height == 0 { return }
+	if m.Width == 0 || m.Height == 0 {
+		return
+	}
 
 	// Header & Status heights
 	// Verification: ASCII(3) + blank(1) + Meta(1) + Padding(1,0)=2 + Sep(1) = 8 lines
-	headerH := 8 
+	headerH := 8
 	statusH := 1
-	
+
 	mainH = m.Height - headerH - statusH - 2
-	if mainH < 10 { mainH = 10 }
+	if mainH < 10 {
+		mainH = 10
+	}
 
 	menuW = m.Width / 3
-	if menuW < 25 { menuW = 25 } else if menuW > 40 { menuW = 40 }
+	if menuW < 25 {
+		menuW = 25
+	} else if menuW > 40 {
+		menuW = 40
+	}
 	detailW = m.Width - menuW
 
 	// Body height (Active HUD/Info)
@@ -147,13 +153,17 @@ func (m AppModel) GetLayoutDimensions() (menuW, detailW, mainH, bodyH, logH int)
 	if m.Busy || m.ActiveModal == ModalConfirm {
 		bodyH = 4 // Confirms/Busy are shorter
 	}
-	
+
 	spacing := 3
-	if m.Busy { spacing = 1 }
+	if m.Busy {
+		spacing = 1
+	}
 
 	logH = mainH - bodyH - spacing
 
-	if logH < 0 { logH = 0 }
+	if logH < 0 {
+		logH = 0
+	}
 
 	return
 }
@@ -175,30 +185,30 @@ var (
 
 func RenderLogsStr(logs *LogBuffer, width int) string {
 	var b strings.Builder
-	
+
 	if logs == nil {
 		return ""
 	}
 
 	// Pre-apply theme colors to styles
-	baseLogStyle = baseLogStyle.Foreground(theme.CurrentTheme.Foreground).Width(width).PaddingRight(1)
-	errorLogStyle = errorLogStyle.Foreground(theme.CurrentTheme.Error)
-	successLogStyle = successLogStyle.Foreground(theme.CurrentTheme.Success)
-	adbStyle = adbStyle.Foreground(theme.CurrentTheme.Highlight)
-	fastbootStyle = fastbootStyle.Foreground(theme.CurrentTheme.Accent)
-	actionStyle = actionStyle.Foreground(theme.CurrentTheme.Warning)
-	doneStyle = doneStyle.Foreground(theme.CurrentTheme.Success)
-	failedStyle = failedStyle.Foreground(theme.CurrentTheme.Error)
+	baseLogStyle = baseLogStyle.Foreground(CurrentTheme.Foreground).Width(width).PaddingRight(1)
+	errorLogStyle = errorLogStyle.Foreground(CurrentTheme.Error)
+	successLogStyle = successLogStyle.Foreground(CurrentTheme.Success)
+	adbStyle = adbStyle.Foreground(CurrentTheme.Highlight)
+	fastbootStyle = fastbootStyle.Foreground(CurrentTheme.Accent)
+	actionStyle = actionStyle.Foreground(CurrentTheme.Warning)
+	doneStyle = doneStyle.Foreground(CurrentTheme.Success)
+	failedStyle = failedStyle.Foreground(CurrentTheme.Error)
 
-	logs.Iterate(func(l domain.LogEntry) {
+	logs.Iterate(func(l core.LogEntry) {
 		style := baseLogStyle
 		text := l.Text
-		
+
 		// Level-based styling
 		switch l.Level {
-		case domain.LogError:
+		case core.LogError:
 			style = baseLogStyle.Inherit(errorLogStyle)
-		case domain.LogSuccess:
+		case core.LogSuccess:
 			style = baseLogStyle.Inherit(successLogStyle)
 		}
 
@@ -210,7 +220,7 @@ func RenderLogsStr(logs *LogBuffer, width int) string {
 			} else if strings.Contains(text, "fastboot") {
 				cmdPart = strings.Replace(text, "fastboot", fastbootStyle.Render("fastboot"), 1)
 			}
-			
+
 			// Highlight actions
 			for _, action := range []string{"flash", "sideload", "wipe-super", "reboot"} {
 				if strings.Contains(cmdPart, action) {
@@ -249,9 +259,13 @@ func LoadFiles(dir, filter string) []FileItem {
 	filter = strings.ToLower(filter)
 	for _, e := range entries {
 		name := e.Name()
-		if filter != "" && e.IsDir() { continue }
-		if !e.IsDir() && filter != "" && !strings.HasSuffix(strings.ToLower(name), filter) { continue }
-		
+		if filter != "" && e.IsDir() {
+			continue
+		}
+		if !e.IsDir() && filter != "" && !strings.HasSuffix(strings.ToLower(name), filter) {
+			continue
+		}
+
 		items = append(items, FileItem{
 			Name:  name,
 			Path:  filepath.Join(dir, name),
