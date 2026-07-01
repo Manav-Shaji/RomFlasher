@@ -16,7 +16,7 @@ func (m AppModel) View() string {
 		return "Initializing..."
 	}
 
-	// 1. Derived Layout dimensions
+	// Layout dimensions
 	header := renderHeader(m)
 	status := renderStatusBar(m, m.Width)
 	
@@ -26,7 +26,7 @@ func (m AppModel) View() string {
 	menu := renderMenu(m, menuW, mainH)
 	details := renderDetails(m, detailW, mainH)
 
-	// 3. Assemble Primary Layout
+	// Assemble Layout
 	main := lipgloss.JoinHorizontal(lipgloss.Top, menu, details)
 	content := lipgloss.JoinVertical(lipgloss.Left, header, main, status)
 	
@@ -40,7 +40,7 @@ func (m AppModel) View() string {
 		lipgloss.WithWhitespaceForeground(theme.CurrentTheme.Background),
 	)
 
-	// 4. Overlay Modal (Skip if handled inline in details)
+	// Overlay Modal
 	if m.ActiveModal != ModalNone && m.ActiveModal != ModalConfirm {
 		modal := renderModal(m)
 		return lipgloss.Place(m.Width, m.Height,
@@ -58,7 +58,7 @@ func (m AppModel) View() string {
 ─────────────────────────────── */
 
 func renderHeader(m AppModel) string {
-	// 1. Large Block ASCII Title with Color Accents
+	// Title
 	line1 := "█ █ █▀█ █ ▀▀█▄   █▀▀ █   █▀█ █▀▀ █  █ █▀▀ █▀█"
 	line2 := "▀▄▀ █▄█ █ █  █   █▀  █   █▀█ ▀▀█ █▀▀█ █▀  █▀▄"
 	line3 := " ▀  ▀▀▀ ▀ ▀▀▀    ▀   ▀▀▀ ▀ ▀ ▀▀▀ ▀  ▀ ▀▀▀ ▀ ▀"
@@ -67,7 +67,7 @@ func renderHeader(m AppModel) string {
 	t2 := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Bold(true).Render(line2)
 	t3 := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render(line3)
 
-	// 2. HUD Badges
+	// Badges
 	badge := theme.BadgeStyle.Copy()
 	
 	metadata := lipgloss.JoinHorizontal(lipgloss.Center,
@@ -76,7 +76,7 @@ func renderHeader(m AppModel) string {
 		badge.Render(" ENGINE: ONLINE "),
 	)
 
-	// 3. Compose HUD
+	// HUD
 	banner := lipgloss.JoinVertical(lipgloss.Center,
 		t1, t2, t3,
 		"",
@@ -85,7 +85,7 @@ func renderHeader(m AppModel) string {
 
 	centered := lipgloss.NewStyle().Width(m.Width).Align(lipgloss.Center).Padding(1, 0).Render(banner)
 	
-	// Gradient Separator (simulated)
+	// Separator
 	sepLine := strings.Repeat("━", m.Width/2)
 	sepStyle1 := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Title).Render(sepLine)
 	sepStyle2 := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Render(sepLine)

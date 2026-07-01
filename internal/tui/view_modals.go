@@ -87,7 +87,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 		Render(" COMMAND CONSOLE ")
 	var b strings.Builder
 	innerW := w - 6
-	// 1. Output Panel
+	// Output Panel
 	outputTitle := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Highlight).Bold(true).Render("🖥️  OUTPUT")
 	b.WriteString(outputTitle)
 	b.WriteByte('\n')
@@ -110,7 +110,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	b.WriteString(outputBox)
 	b.WriteByte('\n')
 
-	// 2. Input Panel
+	// Input Panel
 	inputLabel := lipgloss.NewStyle().Foreground(theme.CurrentTheme.Background).Background(theme.CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
 	m.UI.TextInput.Prompt = lipgloss.NewStyle().Foreground(theme.CurrentTheme.Accent).Render(" ❯ ")
 	inputField := m.UI.TextInput.View()
@@ -122,7 +122,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	b.WriteString("\n\n")
 
 	
-	// 3. Footer
+	// Footer
 	examples := theme.DimStyle.Copy().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
 	if m.Modal.CustomLogs.Len() > 0 || m.Busy {
 		examples = theme.DimStyle.Copy().Render(fmt.Sprintf(" History: %d lines", m.Modal.CustomLogs.Len()))

@@ -253,7 +253,7 @@ func (m AppModel) handleLogMsg(msg engine.LogMsg) (tea.Model, tea.Cmd) {
 	line := string(msg)
 
 
-	// 1. Process Standard Logs
+	// Process Standard Logs
 	isOverwrite := strings.HasPrefix(line, "\r")
 
 	cleanLine := strings.TrimPrefix(line, "\r")

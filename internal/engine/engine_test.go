@@ -9,21 +9,14 @@ import (
 	"flashtool/internal/config"
 )
 
-// Test that sideload command arguments are correctly parsed to set the working directory.
+// Test sideload directory parsing
 func TestRunCommand_Sideload_Dir(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	cfg := &config.AppConfig{}
 	
-	// Create dummy logger and cfg
 	_ = logger
 	_ = cfg
 	
-	// We just want to test that the sideload execution handles paths correctly.
-	// Since RunCommand actually tries to execute, we can't easily mock it without refactoring RunCommand.
-	// We will create a small wrapper logic that mimics RunCommand's setup just to assert.
-	// Wait, actually the prompt says: "Confirm RunCommand's existing logic... correctly splits the full path it now receives. Add/update tests covering that Sideload results in cmd.Dir == /some/dir".
-
-	// Let's test the logic directly:
 	args := []string{"sideload", "/some/dir/rom.zip"}
 	name := "adb"
 	

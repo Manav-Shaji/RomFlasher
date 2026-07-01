@@ -102,7 +102,7 @@ type Toast struct {
 /* APP MODEL */
 
 type AppModel struct {
-	// 1. Core State
+	// Core State
 	Width, Height int
 	Selection     int
 	Menu          []MenuItem
@@ -112,17 +112,17 @@ type AppModel struct {
 
 	App           *app.App
 
-	// 2. Device State
+	// Device State
 	Device domain.DeviceState
 
-	// 3. UI Components (Standard Bubbles)
+	// UI Components
 	UI struct {
 		Viewport  viewport.Model
 		Progress  progress.Model
 		TextInput textinput.Model
 	}
 
-	// 4. Modal / Overlay Data
+	// Modal Data
 	Modal struct {
 		ConfirmMsg string
 		OnConfirm  func() tea.Cmd
@@ -143,12 +143,12 @@ type AppModel struct {
 		SettingsInputs []textinput.Model
 	}
 
-	// 5. Feedback & Logs
+	// Logs
 	Logs        *LogBuffer
 	ActiveToast *Toast
 	LogsDirty   bool
 
-	// 6. Config & Paths
+	// Config
 	BaseDir    string
 	DevicePath string
 

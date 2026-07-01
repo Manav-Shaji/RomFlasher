@@ -43,7 +43,7 @@ type AppConfig struct {
 func Load() (*AppConfig, error) {
 	v := viper.New()
 
-	// 1. Set Defaults
+	// Set Defaults
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
 	v.SetDefault("log.dir", "logs")
@@ -53,12 +53,12 @@ func Load() (*AppConfig, error) {
 	v.SetDefault("base_dir", pwd)
 	v.SetDefault("folders", map[string]string{})
 
-	// 2. Setup Env variables (e.g. NEXFORGE_LOG_LEVEL)
+	// Setup Env variables (e.g. NEXFORGE_LOG_LEVEL)
 	v.SetEnvPrefix("NEXFORGE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	// 3. Search Paths
+	// Search Paths
 	v.SetConfigName("config")
 	v.AddConfigPath(".")
 	v.AddConfigPath("./config")
@@ -68,14 +68,14 @@ func Load() (*AppConfig, error) {
 		v.AddConfigPath(filepath.Join(home, ".nexforge"))
 	}
 
-	// 4. Read Config (Ignore not found errors since defaults exist)
+	// Read Config
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
 
-	// 5. Unmarshal into Struct
+	// Unmarshal into Struct
 	var cfg AppConfig
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)

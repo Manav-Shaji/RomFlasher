@@ -130,7 +130,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) GetLayoutDimensions() (menuW, detailW, mainH, bodyH, logH int) {
 	if m.Width == 0 || m.Height == 0 { return }
 
-	// 1. Header & Status heights
+	// Header & Status heights
 	// Verification: ASCII(3) + blank(1) + Meta(1) + Padding(1,0)=2 + Sep(1) = 8 lines
 	headerH := 8 
 	statusH := 1
@@ -142,7 +142,7 @@ func (m AppModel) GetLayoutDimensions() (menuW, detailW, mainH, bodyH, logH int)
 	if menuW < 25 { menuW = 25 } else if menuW > 40 { menuW = 40 }
 	detailW = m.Width - menuW
 
-	// 2. Body height (Active HUD/Info)
+	// Body height (Active HUD/Info)
 	bodyH = 6 // Default HUD height
 	if m.Busy || m.ActiveModal == ModalConfirm {
 		bodyH = 4 // Confirms/Busy are shorter
@@ -180,7 +180,7 @@ func RenderLogsStr(logs *LogBuffer, width int) string {
 		return ""
 	}
 
-	// Pre-apply theme colors to the package-level styles once per render (in case theme changed)
+	// Pre-apply theme colors to styles
 	baseLogStyle = baseLogStyle.Foreground(theme.CurrentTheme.Foreground).Width(width).PaddingRight(1)
 	errorLogStyle = errorLogStyle.Foreground(theme.CurrentTheme.Error)
 	successLogStyle = successLogStyle.Foreground(theme.CurrentTheme.Success)
@@ -194,7 +194,7 @@ func RenderLogsStr(logs *LogBuffer, width int) string {
 		style := baseLogStyle
 		text := l.Text
 		
-		// 1. Level-based styling
+		// Level-based styling
 		switch l.Level {
 		case domain.LogError:
 			style = baseLogStyle.Inherit(errorLogStyle)
@@ -202,7 +202,7 @@ func RenderLogsStr(logs *LogBuffer, width int) string {
 			style = baseLogStyle.Inherit(successLogStyle)
 		}
 
-		// 2. Keyword Highlighting
+		// Keyword Highlighting
 		if strings.HasPrefix(text, ">") {
 			cmdPart := text
 			if strings.Contains(text, "adb") {
@@ -221,7 +221,7 @@ func RenderLogsStr(logs *LogBuffer, width int) string {
 			text = cmdPart
 		}
 
-		// 3. Status Highlights
+		// Status Highlights
 		if strings.Contains(text, "[ DONE ]") {
 			text = strings.Replace(text, "[ DONE ]", doneStyle.Render("[ DONE ]"), 1)
 		} else if strings.Contains(text, "[ FAILED") {
