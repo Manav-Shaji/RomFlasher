@@ -57,7 +57,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}))
 		}
 	case ModalCustom:
-		if !m.Busy {
+		if m.State == core.StateIdle {
 			newTi, tiCmd := m.UI.TextInput.Update(msg)
 			m.UI.TextInput = newTi
 			cmd = tiCmd
@@ -68,7 +68,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ModalConfirm:
 		switch strings.ToLower(msg.String()) {
 		case "y", "enter":
-			m.ActiveModal, m.Busy = ModalNone, true
+			m.ActiveModal, m.State = ModalNone, core.StatePreparing
 			m.UI.TextInput.Blur()
 			if m.Modal.OnConfirm != nil {
 				return m, m.Modal.OnConfirm()
@@ -119,7 +119,7 @@ func updateModal(m AppModel, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case ModalCustom:
-		if msg.String() == "enter" && !m.Busy {
+		if msg.String() == "enter" && m.State == core.StateIdle {
 			val := m.UI.TextInput.Value()
 			if val != "" {
 				m.ActiveModal = ModalConfirm
@@ -218,7 +218,7 @@ func (m AppModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.Busy {
+	if m.State != core.StateIdle {
 		if msg.String() == "ctrl+c" || msg.String() == "esc" {
 			m.App.Engine.CancelActiveCommand()
 			return m, nil
@@ -246,7 +246,7 @@ func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) handlePollMsg(_ platform.PollMsg) (tea.Model, tea.Cmd) {
-	if m.Busy {
+	if m.State != core.StateIdle {
 		return m, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg { return platform.PollMsg(t) })
 	}
 	return m, tea.Batch(func() tea.Msg { return platform.CheckDeviceState() }, platform.PollDeviceCmd())
@@ -299,7 +299,15 @@ func (m AppModel) handleLogMsg(msg core.LogMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) handleTaskComplete(msg core.TaskCompleteMsg) (tea.Model, tea.Cmd) {
-	m.Busy = false
+	if msg.Err != nil {
+		m.State = core.StateFailed
+	} else {
+		m.State = core.StateCompleted
+	}
+	
+	// Reset to idle after a bit, handled by tick or manually, but for now just idle
+	m.State = core.StateIdle
+
 	status := "[ DONE ]"
 	if msg.Err != nil {
 		m.ActiveToast = &Toast{Message: "Failed", Type: core.LogError}
@@ -495,6 +503,9 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 					return SetupConfirmMsg{
 						Msg: "Flash RECOVERY with: " + filepath.Base(p) + "?",
 						Cmd: m.App.Engine.ExecuteAsync(func(ctx context.Context) error {
+							if err := m.App.Engine.FlashService.ValidateDeviceForFlash(ctx, m.Device, p); err != nil {
+								return err
+							}
 							return m.App.Engine.FlashService.FlashImage(ctx, "recovery", p)
 						}),
 					}
@@ -512,6 +523,9 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 					return SetupConfirmMsg{
 						Msg: "Flash BOOT with: " + filepath.Base(p) + "?",
 						Cmd: m.App.Engine.ExecuteAsync(func(ctx context.Context) error {
+							if err := m.App.Engine.FlashService.ValidateDeviceForFlash(ctx, m.Device, p); err != nil {
+								return err
+							}
 							return m.App.Engine.FlashService.FlashImage(ctx, "boot", p)
 						}),
 					}
@@ -529,6 +543,9 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 					return SetupConfirmMsg{
 						Msg: "WIPE SUPER and Flash: " + filepath.Base(p) + "?",
 						Cmd: m.App.Engine.ExecuteAsync(func(ctx context.Context) error {
+							if err := m.App.Engine.FlashService.ValidateDeviceForFlash(ctx, m.Device, p); err != nil {
+								return err
+							}
 							return m.App.Engine.FlashService.WipeSuper(ctx, p)
 						}),
 					}
@@ -546,6 +563,9 @@ func handleMenuSelect(m AppModel) (tea.Model, tea.Cmd) {
 					return SetupConfirmMsg{
 						Msg: "Sideload: " + filepath.Base(p) + "?",
 						Cmd: m.App.Engine.ExecuteAsync(func(ctx context.Context) error {
+							if err := m.App.Engine.FlashService.ValidateDeviceForSideload(ctx, m.Device, p); err != nil {
+								return err
+							}
 							return m.App.Engine.FlashService.Sideload(ctx, p)
 						}),
 					}

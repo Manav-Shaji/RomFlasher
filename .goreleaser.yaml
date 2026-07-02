@@ -1,0 +1,28 @@
+version: 2
+
+project_name: NexForge
+
+builds:
+  - id: windows-amd64
+    main: ./cmd/nexforge
+    binary: NexForge
+    env:
+      - GOOS=windows
+      - GOARCH=amd64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

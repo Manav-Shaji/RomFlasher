@@ -1,4 +1,4 @@
-package app
+package config
 
 import (
 	"fmt"
@@ -8,12 +8,10 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"flashtool/internal/config"
 )
 
 // InitLogger creates a new Zap logger based on the provided configuration.
-func InitLogger(cfg *config.AppConfig) (*zap.Logger, error) {
+func InitLogger(cfg *AppConfig) (*zap.Logger, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}

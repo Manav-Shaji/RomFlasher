@@ -14,9 +14,28 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"go.uber.org/zap"
 
-	"flashtool/internal/config"
 	"flashtool/internal/platform"
 )
+
+type LogLevel string
+
+const (
+	LogInfo    LogLevel = "INFO"
+	LogError   LogLevel = "ERROR"
+	LogSuccess LogLevel = "SUCCESS"
+)
+
+type LogEntry struct {
+	Level     LogLevel
+	Text      string
+	Timestamp time.Time
+}
+
+// Executor defines how shell commands are executed.
+// This allows the Engine to inject a UI-aware executor that streams logs.
+type Executor interface {
+	RunCommand(ctx context.Context, name string, args ...string) error
+}
 
 type LogMsg string
 type ProgressMsg float64
@@ -26,7 +45,6 @@ type TaskCompleteMsg struct{ Err error }
 type Engine struct {
 	LogChan chan string
 	logger  *zap.Logger
-	cfg     *config.AppConfig
 
 	FlashService  FlashService
 	DeviceService DeviceService
@@ -36,13 +54,12 @@ type Engine struct {
 }
 
 // NewEngine creates a new core Engine.
-func NewEngine(cfg *config.AppConfig, logger *zap.Logger) *Engine {
+func NewEngine(logger *zap.Logger) *Engine {
 	platform.ExtractEmbeddedBinaries()
 
 	e := &Engine{
 		LogChan: make(chan string, 200),
 		logger:  logger,
-		cfg:     cfg,
 	}
 
 	e.FlashService = NewFlashService(e)
@@ -208,15 +225,17 @@ func (e *Engine) RunCommand(ctx context.Context, name string, args ...string) er
 	go stream(stdout)
 	go stream(stderr)
 
+	startExec := time.Now()
 	err = cmd.Wait()
 	wg.Wait()
+	elapsed := time.Since(startExec)
 
 	if err != nil {
 		e.LogChan <- fmt.Sprintf("EXECUTION ERROR: %v", err)
-		e.logger.Error("Command execution returned error", zap.Error(err))
+		e.logger.Error("Command execution returned error", zap.Error(err), zap.Duration("elapsed", elapsed))
 	} else {
-		e.LogChan <- "SUCCESS: Task finished successfully."
-		e.logger.Info("Command executed successfully")
+		e.LogChan <- fmt.Sprintf("SUCCESS: Task finished successfully in %v.", elapsed.Round(time.Millisecond))
+		e.logger.Info("Command executed successfully", zap.Duration("elapsed", elapsed))
 	}
 
 	if ctx.Err() == context.Canceled {

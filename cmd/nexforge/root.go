@@ -1,4 +1,4 @@
-package cli
+package main
 
 import (
 	"fmt"
@@ -7,12 +7,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"flashtool/internal/app"
+	"flashtool/internal/config"
 	"flashtool/internal/tui"
 )
 
 var (
-	applicationContainer *app.App
+	applicationContainer *config.App
 )
 
 var rootCmd = &cobra.Command{
@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 	Long:  `NexForge is a powerful TUI and CLI application for flashing Android ROMs via Fastboot and ADB.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		applicationContainer, err = app.Initialize()
+		applicationContainer, err = config.Initialize()
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"flashtool/internal/config"
 	"go.uber.org/zap"
 	"os/exec"
 	"path/filepath"
@@ -12,10 +11,7 @@ import (
 // Test sideload directory parsing
 func TestRunCommand_Sideload_Dir(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-	cfg := &config.AppConfig{}
-
 	_ = logger
-	_ = cfg
 
 	args := []string{"sideload", "/some/dir/rom.zip"}
 	name := "adb"

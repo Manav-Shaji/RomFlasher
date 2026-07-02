@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"flashtool/internal/app"
+	"flashtool/internal/config"
 	"flashtool/internal/core"
 	"flashtool/internal/platform"
 
@@ -105,11 +105,11 @@ type AppModel struct {
 	Width, Height int
 	Selection     int
 	Menu          []MenuItem
-	Busy          bool
+	State         core.FlashState
 	ActiveModal   ModalType
 	Tick          int // Pulsing animation tick
 
-	App *app.App
+	App *config.App
 
 	// Device State
 	Device platform.DeviceState
@@ -157,7 +157,7 @@ type AppModel struct {
 
 /* FACTORY */
 
-func NewModel(app *app.App) AppModel {
+func NewModel(app *config.App) AppModel {
 	m := AppModel{
 		App:        app,
 		BaseDir:    app.Config.BaseDir,

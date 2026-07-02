@@ -13,6 +13,27 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type DeviceMode string
+
+const (
+	ModeDisconnected DeviceMode = "DISCONNECTED"
+	ModeFastboot     DeviceMode = "FASTBOOT"
+	ModeDevice       DeviceMode = "DEVICE"
+	ModeRecovery     DeviceMode = "RECOVERY"
+	ModeSideload     DeviceMode = "SIDELOAD"
+	ModeUnauthorized DeviceMode = "UNAUTHORIZED"
+	ModeOffline      DeviceMode = "OFFLINE"
+)
+
+type DeviceState struct {
+	Mode    DeviceMode
+	Serial  string
+	Model   string
+	Battery string
+	Slot    string
+	Secure  string
+}
+
 var (
 	reProduct = regexp.MustCompile(`product:\s*(\S+)`)
 	reBattery = regexp.MustCompile(`battery-voltage:\s*(\S+)`)
@@ -45,24 +66,32 @@ func PollDeviceCmd() tea.Cmd {
 	)
 }
 
-func runFastbootCmd(args ...string) ([]byte, error) {
-	cmdPath, err := ResolveCommandPath("fastboot")
+func runCmdWithRetry(cmdName string, timeout time.Duration, retries int, args ...string) ([]byte, error) {
+	cmdPath, err := ResolveCommandPath(cmdName)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return exec.CommandContext(ctx, cmdPath, args...).CombinedOutput()
+	var lastErr error
+	var out []byte
+	for i := 0; i < retries; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		out, err = exec.CommandContext(ctx, cmdPath, args...).CombinedOutput()
+		cancel()
+		if err == nil {
+			return out, nil
+		}
+		lastErr = fmt.Errorf("cmd error (attempt %d): %w", i+1, err)
+		time.Sleep(100 * time.Millisecond)
+	}
+	return out, lastErr
+}
+
+func runFastbootCmd(args ...string) ([]byte, error) {
+	return runCmdWithRetry("fastboot", 3*time.Second, 2, args...)
 }
 
 func runAdbCmd(args ...string) ([]byte, error) {
-	cmdPath, err := ResolveCommandPath("adb")
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return exec.CommandContext(ctx, cmdPath, args...).CombinedOutput()
+	return runCmdWithRetry("adb", 3*time.Second, 2, args...)
 }
 
 func CheckDeviceState() tea.Msg {

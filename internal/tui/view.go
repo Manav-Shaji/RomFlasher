@@ -157,7 +157,7 @@ func renderDetails(m AppModel, width, height int) string {
 	switch {
 	case m.ActiveModal == ModalConfirm:
 		body = renderConfirmView(m, width)
-	case m.Busy:
+	case m.State != core.StateIdle:
 		body = renderBusyView(m, width)
 	case m.Device.Mode == platform.ModeUnauthorized:
 		body = renderUnauthorizedView(width)
@@ -299,8 +299,10 @@ func renderConfirmView(m AppModel, width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, box)
 }
 
-func renderBusyView(_ AppModel, _ int) string {
-	return ""
+func renderBusyView(m AppModel, width int) string {
+	stateMsg := fmt.Sprintf("⚙️  %s...", strings.ToUpper(m.State.String()))
+	box := BorderStyle.Copy().BorderForeground(CurrentTheme.Highlight).Width(width - 4).Align(lipgloss.Center).Render(stateMsg)
+	return lipgloss.JoinVertical(lipgloss.Center, "", box)
 }
 
 func renderUnauthorizedView(width int) string {
@@ -452,7 +454,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	m.Modal.CustomViewport.Height = 11
 
 	outputContent := m.Modal.CustomViewport.View()
-	if m.Modal.CustomLogs.Len() == 0 && !m.Busy {
+	if m.Modal.CustomLogs.Len() == 0 && m.State == core.StateIdle {
 		outputContent = DimStyle.Copy().Italic(true).Render("\n\n  Terminal initialized. Enter command below...")
 	}
 
@@ -470,8 +472,8 @@ func renderCustomModal(m AppModel, w, _ int) string {
 	inputLabel := lipgloss.NewStyle().Foreground(CurrentTheme.Background).Background(CurrentTheme.Accent).Bold(true).Padding(0, 1).Render(" COMMAND ")
 	m.UI.TextInput.Prompt = lipgloss.NewStyle().Foreground(CurrentTheme.Accent).Render(" ❯ ")
 	inputField := m.UI.TextInput.View()
-	if m.Busy {
-		inputField = DimStyle.Copy().Render("Executing command... ⚡")
+	if m.State != core.StateIdle {
+		inputField = DimStyle.Copy().Render(fmt.Sprintf("%s... ⚡", m.State.String()))
 	}
 
 	inputLine := lipgloss.JoinHorizontal(lipgloss.Left, inputLabel, " ", inputField)
@@ -481,7 +483,7 @@ func renderCustomModal(m AppModel, w, _ int) string {
 
 	// Footer
 	examples := DimStyle.Copy().Render(" Try: 'adb shell getprop' or 'fastboot getvar all'")
-	if m.Modal.CustomLogs.Len() > 0 || m.Busy {
+	if m.Modal.CustomLogs.Len() > 0 || m.State != core.StateIdle {
 		examples = DimStyle.Copy().Render(fmt.Sprintf(" History: %d lines", m.Modal.CustomLogs.Len()))
 	}
 

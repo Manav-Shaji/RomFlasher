@@ -85,7 +85,38 @@ func Load() (*AppConfig, error) {
 		cfg.Folders = make(map[string]string)
 	}
 
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	return &cfg, nil
+}
+
+// Validate ensures configuration fields have sensible defaults and are valid
+func (c *AppConfig) Validate() error {
+	if c.BaseDir == "" {
+		pwd, _ := os.Getwd()
+		c.BaseDir = pwd
+	}
+	
+	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
+	if !validLevels[strings.ToLower(c.Log.Level)] {
+		c.Log.Level = "info"
+	}
+	
+	if c.Log.Dir == "" {
+		c.Log.Dir = "logs"
+	}
+	if c.Log.Filename == "" {
+		c.Log.Filename = "app.log"
+	}
+	
+	// Create log directory if it doesn't exist
+	if _, err := os.Stat(c.Log.Dir); os.IsNotExist(err) {
+		_ = os.MkdirAll(c.Log.Dir, 0755)
+	}
+	
+	return nil
 }
 
 // SaveConfig saves the AppConfig to the filesystem (legacy support for TUI Settings)

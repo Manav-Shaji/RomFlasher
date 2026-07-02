@@ -150,12 +150,12 @@ func (m AppModel) GetLayoutDimensions() (menuW, detailW, mainH, bodyH, logH int)
 
 	// Body height (Active HUD/Info)
 	bodyH = 6 // Default HUD height
-	if m.Busy || m.ActiveModal == ModalConfirm {
+	if m.State != core.StateIdle || m.ActiveModal == ModalConfirm {
 		bodyH = 4 // Confirms/Busy are shorter
 	}
 
 	spacing := 3
-	if m.Busy {
+	if m.State != core.StateIdle {
 		spacing = 1
 	}
 
